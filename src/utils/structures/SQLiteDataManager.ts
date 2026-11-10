@@ -16,6 +16,30 @@ export const BOT_SETTINGS_DEFAULTS: BotSettings = {
     enableAudioCache: true,
 };
 
+export const DATABASE_EXPORT_FORMAT = "rawon-libre-database";
+export const DATABASE_EXPORT_VERSION = 1;
+
+// Parents first: request channels, player states and queue states all reference a
+// guild. cookies_state is left out on purpose, since it indexes cookie files that
+// only exist on the machine that wrote it.
+const PORTABLE_TABLES = [
+    "guilds",
+    "request_channels",
+    "player_states",
+    "queue_states",
+    "bot_settings",
+] as const;
+
+export type PortableTable = (typeof PORTABLE_TABLES)[number];
+type ExportedRow = Record<string, number | string | null>;
+
+export type DatabaseExport = {
+    format: typeof DATABASE_EXPORT_FORMAT;
+    version: number;
+    exportedAt: string;
+    tables: Record<PortableTable, ExportedRow[]>;
+};
+
 export class SQLiteDataManager<T extends Record<string, GuildData> = Record<string, GuildData>> {
     private readonly db: Database.Database;
     private readonly manager = new OperationManager();
@@ -680,7 +704,129 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
         });
     }
 
+    /** Everything an operator would want to carry to another host, as plain rows. */
+    public exportData(): DatabaseExport {
+        const tables = {} as DatabaseExport["tables"];
+        for (const table of PORTABLE_TABLES) {
+            tables[table] = this.db.prepare(`SELECT * FROM ${table}`).all() as ExportedRow[];
+        }
+
+        return {
+            format: DATABASE_EXPORT_FORMAT,
+            version: DATABASE_EXPORT_VERSION,
+            exportedAt: new Date().toISOString(),
+            tables,
+        };
+    }
+
+    /**
+     * Replace the portable tables with the rows of an export. The swap happens in
+     * one transaction: a row the schema rejects rolls the whole import back and
+     * leaves the database as it was. Resolves to the number of rows per table.
+     */
+    public async importData(raw: unknown): Promise<Record<PortableTable, number>> {
+        const dump = parseDatabaseExport(raw);
+        const counts = {} as Record<PortableTable, number>;
+
+        await this.manager.add(async () => {
+            const replaceAll = this.db.transaction(() => {
+                // Children before the guilds they reference, then back in order.
+                for (const table of [...PORTABLE_TABLES].reverse()) {
+                    this.db.prepare(`DELETE FROM ${table}`).run();
+                }
+
+                for (const table of PORTABLE_TABLES) {
+                    // Column names reach the statement text, so only ones this
+                    // schema really has are taken from the file.
+                    const known = new Set(
+                        (
+                            this.db.prepare(`PRAGMA table_info(${table})`).all() as {
+                                name: string;
+                            }[]
+                        ).map((column) => column.name),
+                    );
+
+                    counts[table] = 0;
+                    for (const row of dump.tables[table]) {
+                        const columns = Object.keys(row).filter((column) => known.has(column));
+                        if (columns.length === 0) {
+                            continue;
+                        }
+
+                        this.db
+                            .prepare(
+                                `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns
+                                    .map(() => "?")
+                                    .join(", ")})`,
+                            )
+                            .run(...columns.map((column) => row[column]));
+                        counts[table] += 1;
+                    }
+                }
+
+                this.db.exec("INSERT OR IGNORE INTO bot_settings (id) VALUES (1)");
+            });
+
+            replaceAll();
+            this.loadBotSettings();
+        });
+
+        await this.load();
+        return counts;
+    }
+
     public close(): void {
         this.db.close();
     }
+}
+
+/**
+ * Check that a parsed file is an export this version can read, and say what is
+ * wrong with it when it is not. Throws an Error whose message is fit to show.
+ */
+export function parseDatabaseExport(raw: unknown): DatabaseExport {
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+        typeof value === "object" && value !== null && !Array.isArray(value);
+
+    if (!isRecord(raw) || raw.format !== DATABASE_EXPORT_FORMAT) {
+        throw new Error("it was not produced by the export command");
+    }
+    if (typeof raw.version !== "number" || raw.version > DATABASE_EXPORT_VERSION) {
+        throw new Error(
+            `it uses format version ${String(raw.version)}, and this bot reads up to ${DATABASE_EXPORT_VERSION}`,
+        );
+    }
+    if (!isRecord(raw.tables)) {
+        throw new Error("it has no tables");
+    }
+
+    const tables = {} as DatabaseExport["tables"];
+    for (const table of PORTABLE_TABLES) {
+        const rows = raw.tables[table];
+        if (!Array.isArray(rows)) {
+            throw new Error(`the "${table}" table is missing`);
+        }
+
+        for (const row of rows) {
+            if (!isRecord(row)) {
+                throw new Error(`the "${table}" table holds something that is not a row`);
+            }
+            for (const [column, value] of Object.entries(row)) {
+                if (value !== null && typeof value !== "string" && typeof value !== "number") {
+                    throw new Error(
+                        `"${table}.${column}" holds a value that is not text or a number`,
+                    );
+                }
+            }
+        }
+
+        tables[table] = rows as ExportedRow[];
+    }
+
+    return {
+        format: DATABASE_EXPORT_FORMAT,
+        version: raw.version,
+        exportedAt: typeof raw.exportedAt === "string" ? raw.exportedAt : "",
+        tables,
+    };
 }

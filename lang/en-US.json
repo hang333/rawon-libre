@@ -1,6 +1,22 @@
 {
     "commands": {
         "developers": {
+            "database": {
+                "description": "Export or import the bot's database",
+                "usage": "{prefix}database <export | import>",
+                "slashExportDescription": "Send yourself a backup of the bot's database",
+                "slashImportDescription": "Replace the bot's database with an exported backup",
+                "slashFileDescription": "A backup file made by the export subcommand",
+                "invalidSubcommand": "Usage: {usage}",
+                "exportDm": "Here is the database backup you asked for. Keep it private: it lists every server's settings.",
+                "exportSent": "Database exported ({guilds} servers). The file is in your direct messages.",
+                "dmFailed": "I couldn't send you a direct message. Allow direct messages from this server and try again.",
+                "noFile": "Attach the backup file you want to import. Usage: {usage}",
+                "tooLarge": "That file is too large to be a database backup.",
+                "invalidFile": "That file can't be used as a database backup: {reason}.",
+                "importFailed": "The import failed and nothing was changed: {reason}.",
+                "imported": "Database imported ({guilds} servers). The data it replaced was saved to {backup}. Restart the bot so that every part of it picks up the new data."
+            },
             "eval": {
                 "description": "Evaluate JavaScript code",
                 "errorString": "Error",

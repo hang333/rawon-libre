@@ -1,6 +1,22 @@
 {
     "commands": {
         "developers": {
+            "database": {
+                "description": "匯出或匯入機器人的資料庫",
+                "usage": "{prefix}database <export | import>",
+                "slashExportDescription": "把機器人資料庫的備份傳送給你自己",
+                "slashImportDescription": "用匯出的備份取代機器人的資料庫",
+                "slashFileDescription": "由 export 子指令產生的備份檔案",
+                "invalidSubcommand": "用法:{usage}",
+                "exportDm": "這是你要的資料庫備份。請妥善保管:其中包含每個伺服器的設定。",
+                "exportSent": "資料庫已匯出({guilds} 個伺服器)。檔案已傳送到你的私訊。",
+                "dmFailed": "我無法傳送私訊給你。請允許來自此伺服器的私訊後再試一次。",
+                "noFile": "請附上要匯入的備份檔案。用法:{usage}",
+                "tooLarge": "該檔案太大,不可能是資料庫備份。",
+                "invalidFile": "該檔案不能當作資料庫備份使用:{reason}。",
+                "importFailed": "匯入失敗,沒有任何資料被更改:{reason}。",
+                "imported": "資料庫已匯入({guilds} 個伺服器)。被取代的資料已儲存到 {backup}。請重新啟動機器人,讓各個部分都讀取到新資料。"
+            },
             "eval": {
                 "description": "對代碼進行評估",
                 "errorString": "錯誤",

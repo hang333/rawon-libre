@@ -1,6 +1,22 @@
 {
     "commands": {
         "developers": {
+            "database": {
+                "description": "导出或导入机器人的数据库",
+                "usage": "{prefix}database <export | import>",
+                "slashExportDescription": "把机器人数据库的备份发送给你自己",
+                "slashImportDescription": "用导出的备份替换机器人的数据库",
+                "slashFileDescription": "由 export 子命令生成的备份文件",
+                "invalidSubcommand": "用法:{usage}",
+                "exportDm": "这是你要的数据库备份。请妥善保管:其中包含每个服务器的设置。",
+                "exportSent": "数据库已导出({guilds} 个服务器)。文件已发送到你的私信。",
+                "dmFailed": "我无法给你发送私信。请允许来自此服务器的私信后重试。",
+                "noFile": "请附上要导入的备份文件。用法:{usage}",
+                "tooLarge": "该文件太大,不可能是数据库备份。",
+                "invalidFile": "该文件不能用作数据库备份:{reason}。",
+                "importFailed": "导入失败,没有任何数据被更改:{reason}。",
+                "imported": "数据库已导入({guilds} 个服务器)。被替换的数据已保存到 {backup}。请重启机器人,让各个部分都读取到新数据。"
+            },
             "eval": {
                 "description": "对代码进行评估",
                 "errorString": "错误",
