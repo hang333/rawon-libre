@@ -103,6 +103,7 @@ export class GoogleLoginManager {
     private tunnelError: string | null = null;
     private cancelRequested = false;
     private finishLoginWait: ((loggedIn: boolean) => void) | null = null;
+    private readonly passkeyDialogOff = new WeakSet<Page>();
 
     public constructor(chromiumPath?: string, devtoolsPort = 3000, useTunnel = false) {
         this.tunnel = useTunnel ? new QuickTunnel() : null;
@@ -324,6 +325,41 @@ export class GoogleLoginManager {
                 "Accept-Language": "en-US,en;q=0.9",
             });
         } catch {}
+
+        await this.disablePasskeyDialog(page);
+    }
+
+    /**
+     * Keep Chromium from opening its own dialog when a page asks for a passkey.
+     *
+     * Google asks for one first on an account that has one. Chromium answers
+     * with a dialog that is not part of the page: headless there is nothing to
+     * show it on and nothing to dismiss it with, yet it swallows every click
+     * meant for the page under it, the page's own "try another way" included.
+     * The login cannot go on from there.
+     *
+     * A server has no passkey to offer anyway. Putting WebAuthn in its
+     * virtual-authenticator mode, with no authenticator and no UI, opens no
+     * dialog: the request simply stays unanswered and the page keeps taking
+     * clicks, so the user can pick another way to sign in. The setting lasts
+     * only as long as the CDP session that made it, which is therefore left
+     * attached.
+     */
+    private async disablePasskeyDialog(page: Page): Promise<void> {
+        if (this.passkeyDialogOff.has(page)) {
+            return;
+        }
+        this.passkeyDialogOff.add(page);
+
+        try {
+            const session = await page.createCDPSession();
+            await session.send("WebAuthn.enable", { enableUI: false });
+        } catch (error) {
+            this.passkeyDialogOff.delete(page);
+            container.logger.debug(
+                `[GoogleLogin] Could not switch off the passkey dialog: ${(error as Error).message}`,
+            );
+        }
     }
 
     public getSessionInfo(): LoginSessionInfo {
