@@ -19,6 +19,7 @@ import got from "got";
 import { Soundcloud } from "soundcloud.ts";
 import * as config from "../config/index.js";
 import { type GuildData } from "../typings/index.js";
+import { isDeveloperOnly } from "../utils/functions/isDeveloperOnly.js";
 import { SpotifyUtil } from "../utils/handlers/SpotifyUtil.js";
 import { AudioCacheManager } from "../utils/structures/AudioCacheManager.js";
 import { ClientUtils } from "../utils/structures/ClientUtils.js";
@@ -65,7 +66,7 @@ function wrapCommand(cmd: Command): CompatibleCommand {
             description: cmd.description,
             aliases: cmd.aliases as readonly string[],
             cooldown: opts.cooldown,
-            devOnly: opts.devOnly,
+            devOnly: isDeveloperOnly(cmd),
             contextChat: opts.contextChat,
             contextUser: opts.contextUser,
             disable: opts.disable,
@@ -183,6 +184,15 @@ class CommandsCompatibility {
 
         if (command.meta.disable) {
             container.logger.debug(`[CommandsCompat] Command "${commandName}" is disabled`);
+            return;
+        }
+
+        // Nothing else stands between a prefix command and its code: the
+        // framework's preconditions are not run on this path.
+        if (command.meta.devOnly === true && !this.client.config.devs.includes(message.author.id)) {
+            container.logger.warn(
+                `[CommandsCompat] Blocked ${message.author.tag} [${message.author.id}] from developer-only command "${command.name}"`,
+            );
             return;
         }
 

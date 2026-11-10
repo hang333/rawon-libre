@@ -19,6 +19,7 @@ import { CommandContext } from "../structures/CommandContext.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
+import { isDeveloperOnly } from "../utils/functions/isDeveloperOnly.js";
 import {
     asPanelInteraction,
     handlePlayerPanelInteraction,
@@ -404,7 +405,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
             );
             if (cmd) {
                 const isDeveloper = this.container.config.devs.includes(interaction.user.id);
-                if (getCommandOptions(cmd).devOnly === true && !isDeveloper) {
+                if (isDeveloperOnly(cmd) && !isDeveloper) {
                     await this.safeReply(
                         interaction,
                         {
@@ -491,7 +492,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                     }
                 }
 
-                if (getCommandOptions(cmd).devOnly === true && !isDeveloper) {
+                if (isDeveloperOnly(cmd) && !isDeveloper) {
                     await this.safeReply(
                         interaction,
                         {
@@ -573,7 +574,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                     .find((x: Command) => x.name === cmd);
                 if (command) {
                     const isDeveloper = this.container.config.devs.includes(interaction.user.id);
-                    if (getCommandOptions(command).devOnly === true && !isDeveloper) {
+                    if (isDeveloperOnly(command) && !isDeveloper) {
                         await this.safeReply(
                             interaction,
                             {
