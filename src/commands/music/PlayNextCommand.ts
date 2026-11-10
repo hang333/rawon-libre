@@ -33,7 +33,8 @@ import { type PlayCommand } from "./PlayCommand.js";
                 opt
                     .setName("query")
                     .setDescription(i18n.__("commands.music.play.slashQueryDescription"))
-                    .setRequired(false),
+                    // Required for the same reason as on `play`.
+                    .setRequired(true),
             )
             .addAttachmentOption((opt) =>
                 opt

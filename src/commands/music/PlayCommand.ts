@@ -46,9 +46,12 @@ import { checkQuery, handleVideos, searchTrack } from "../../utils/handlers/Gene
                 opt
                     .setName("query")
                     .setDescription(i18n.__("commands.music.play.slashQueryDescription"))
-                    // Optional now that an upload can stand in for it; contextRun
-                    // still insists on one or the other.
-                    .setRequired(false),
+                    // Required, although an upload can stand in for it: Discord only
+                    // puts what is typed after the command into an option by
+                    // itself when that option is required. Left optional, plain
+                    // `/play some song` arrives with no query at all. With a file
+                    // attached, the text is a caption and is not searched for.
+                    .setRequired(true),
             )
             .addAttachmentOption((opt) =>
                 opt
