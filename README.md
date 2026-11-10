@@ -165,6 +165,12 @@ internet. Alternatively set `DEVTOOLS_TUNNEL=yes` and drop the port mapping alto
 then opens a Cloudflare quick tunnel for the duration of the login and sends you the link in a
 direct message. See [Cookies Setup](./docs/COOKIES_SETUP.md).
 
+#### yt-dlp updates
+The bot keeps its own copy of `yt-dlp` in the cache volume. It checks for a new release at startup
+and once an hour, and installs one only after it has been out for 24 hours. A download is run once
+to confirm it works before it replaces the current binary. Developers can see the state of this
+with `ytdlp status` and install the newest release straight away with `ytdlp update`.
+
 ## Configuration Files
 - `.env.example` - Essential settings (Discord/Spotify token, prefix, IDs, etc.)
 - `dev.env.example` - Optional developer settings (prefix/slash toggles, sharding, DevTools, debug mode, etc.)

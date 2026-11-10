@@ -117,6 +117,20 @@
                     "disabled": "disabled"
                 },
                 "resetAll": "All bot settings have been reset to defaults."
+            },
+            "ytdlp": {
+                "description": "Check or update the yt-dlp binary",
+                "usage": "{prefix}ytdlp <status | update>",
+                "slashStatusDescription": "Show the installed yt-dlp version and what the updater will do",
+                "slashUpdateDescription": "Install the newest yt-dlp release now",
+                "checking": "Checking yt-dlp releases…",
+                "current": "yt-dlp {version} is installed, and it is the newest release.",
+                "available": "yt-dlp {version} is installed. {target} has been out for a day and will be installed at the next hourly check; {command} installs it now.",
+                "waiting": "yt-dlp {version} is installed. {latest} was released {released} and will be installed on its own {eligible}, once it has been out for 24 hours; {command} installs it now.",
+                "updated": "yt-dlp was updated from {from} to {to}.",
+                "busy": "An update check is already running. Try again in a moment.",
+                "failed": "Could not check or update yt-dlp: {reason}",
+                "unknownVersion": "unknown"
             }
         },
         "general": {

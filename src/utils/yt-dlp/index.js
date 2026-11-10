@@ -1,8 +1,12 @@
-import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { execFile, spawn } from "node:child_process";
+import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import nodePath from "node:path";
 import process from "node:process";
+import { pipeline } from "node:stream/promises";
+import { promisify } from "node:util";
 import got from "got";
+
+const run = promisify(execFile);
 
 const suffix = process.platform === "win32" ? ".exe" : (
     process.platform === "darwin" ? "_macos" : ""
@@ -10,13 +14,22 @@ const suffix = process.platform === "win32" ? ".exe" : (
 const filename = `yt-dlp${suffix}`;
 const scriptsPath = nodePath.resolve(process.cwd(), "cache", "scripts");
 const exePath = nodePath.resolve(scriptsPath, filename);
+// Where a download waits until it has been checked. It keeps the platform's
+// suffix so that it can be run for that check.
+const stagedPath = nodePath.resolve(scriptsPath, `yt-dlp.new${suffix}`);
 
-const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const AUTO_UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
-const AUTO_UPDATE_MIN_BINARY_AGE_MS = 2 * 60 * 60 * 1000;
+const RELEASES_URL = "https://api.github.com/repos/yt-dlp/yt-dlp/releases?per_page=10";
+// A release is taken up on its own only once it has been out this long. A day
+// is enough for a broken or tampered build to be noticed and withdrawn; when a
+// fix is needed sooner, a developer can ask for the newest release by hand.
+const MIN_RELEASE_AGE_MS = 24 * 60 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+// The binary unpacks itself before it can answer, which takes a few seconds.
+const VERSION_TIMEOUT_MS = 60_000;
+const DOWNLOAD_TIMEOUT_MS = 180_000;
 
 let autoUpdateTimer = null;
-let isAutoUpdating = false;
+const updateState = { busy: false, lastCheckAt: null, lastResult: null };
 
 let cookiesManagerRef = null;
 
@@ -96,55 +109,195 @@ export function isAgeRestrictedError(errorMessage) {
     );
 }
 
-export async function downloadExecutable() {
-    let needsDownload = !existsSync(exePath);
+/**
+ * Order two yt-dlp versions. They are dates with an optional build number
+ * (2025.12.08, 2025.12.08.1), so they compare part by part as numbers.
+ */
+export function compareVersions(a, b) {
+    const left = String(a).replace(/^v/, "").split(".").map(Number);
+    const right = String(b).replace(/^v/, "").split(".").map(Number);
 
-    if (!needsDownload) {
-        try {
-            const stat = statSync(exePath);
-            const ageMs = Date.now() - stat.mtimeMs;
-            if (ageMs > UPDATE_INTERVAL_MS) {
-                console.info(`[INFO] Yt-dlp binary is ${Math.floor(ageMs / 3_600_000)} hours old, checking for updates...`);
-                needsDownload = true;
-            }
-        } catch {
-            needsDownload = true;
-        }
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+        const diff = (left[i] || 0) - (right[i] || 0);
+        if (diff !== 0) return diff;
     }
+    return 0;
+}
 
-    if (needsDownload) {
-        const isUpdate = existsSync(exePath);
-        console.info(`[INFO] ${isUpdate ? "Updating" : "Downloading"} yt-dlp...`);
-        try {
-            const releases = await got.get("https://api.github.com/repos/yt-dlp/yt-dlp/releases?per_page=1", {
-                timeout: { request: 15_000 },
-            }).json();
-            const release = releases[0];
-            const asset = release.assets.find(ast => ast.name === filename);
-            await new Promise((resolve, reject) => {
-                got.get(asset.browser_download_url, { timeout: { request: 60_000 } }).buffer().then(x => {
-                    mkdirSync(scriptsPath, { recursive: true });
-                    writeFileSync(exePath, x, { mode: 0o777 });
-                    return 0;
-                }).then(resolve).catch(reject);
-            });
-            console.info(`[INFO] Yt-dlp ${isUpdate ? "updated" : "downloaded"} (release: ${release.tag_name}).`);
-        } catch (err) {
-            if (isUpdate) {
-                console.warn(`[WARN] Yt-dlp update failed, using existing binary: ${err.message}`);
-            } else {
-                throw err;
-            }
-        }
+/**
+ * The releases this platform can run, newest first, reduced to what the
+ * updater needs. Drafts and pre-releases are never candidates.
+ */
+export function usableReleases(releases) {
+    return (Array.isArray(releases) ? releases : [])
+        .filter(release => release && !release.draft && !release.prerelease)
+        .map(release => ({
+            version: String(release.tag_name ?? "").replace(/^v/, ""),
+            publishedAt: Date.parse(release.published_at),
+            url: release.assets?.find(asset => asset.name === filename)?.browser_download_url ?? null,
+        }))
+        .filter(release => release.version && release.url && Number.isFinite(release.publishedAt))
+        .sort((a, b) => compareVersions(b.version, a.version));
+}
+
+/**
+ * The release to be on. Left to itself the updater takes the newest one that
+ * has been out for the minimum age; `force` takes the newest there is.
+ */
+export function selectRelease(releases, { force = false, now = Date.now(), minAgeMs = MIN_RELEASE_AGE_MS } = {}) {
+    if (force) return releases[0] ?? null;
+    return releases.find(release => now - release.publishedAt >= minAgeMs) ?? null;
+}
+
+async function fetchReleases() {
+    return usableReleases(await got.get(RELEASES_URL, { timeout: { request: 15_000 } }).json());
+}
+
+/** The version of the given binary, or null when it is missing or will not run. */
+async function versionOf(binary) {
+    if (!existsSync(binary)) return null;
+    try {
+        const { stdout } = await run(binary, ["--version"], { timeout: VERSION_TIMEOUT_MS, windowsHide: true });
+        return stdout.trim() || null;
+    } catch {
+        return null;
     }
+}
+
+export async function getInstalledVersion() {
+    return versionOf(exePath);
+}
+
+/**
+ * Put a release in place of the current binary. The download is run once to
+ * confirm that it starts and is the version it claims to be, and only then
+ * renamed over the old file, so that a truncated or broken download never
+ * becomes the binary the bot plays with. Renaming rather than overwriting also
+ * leaves a yt-dlp that is running at that moment undisturbed.
+ */
+async function installRelease(release) {
+    mkdirSync(scriptsPath, { recursive: true });
+    rmSync(stagedPath, { force: true });
 
     try {
-        const { execFileSync } = await import("node:child_process");
-        const version = execFileSync(exePath, ["--version"], { timeout: 5000 }).toString().trim();
-        console.info(`[INFO] Using yt-dlp version: ${version}`);
-    } catch {
+        await pipeline(
+            got.stream(release.url, { timeout: { request: DOWNLOAD_TIMEOUT_MS } }),
+            createWriteStream(stagedPath),
+        );
+        chmodSync(stagedPath, 0o755);
+
+        const reported = await versionOf(stagedPath);
+        if (reported === null) {
+            throw new Error(`the downloaded ${release.version} does not run`);
+        }
+        if (compareVersions(reported, release.version) !== 0) {
+            throw new Error(`the download reports version ${reported}, not ${release.version}`);
+        }
+
+        renameSync(stagedPath, exePath);
+    } catch (err) {
+        rmSync(stagedPath, { force: true });
+        // Windows will not replace a program that is running.
+        if (["EPERM", "EBUSY", "EACCES"].includes(err.code)) {
+            throw new Error("yt-dlp is in use and could not be replaced");
+        }
+        throw err;
+    }
+}
+
+/**
+ * Compare the installed binary with the published releases and, unless
+ * `dryRun` is set, install the one it should be on.
+ *
+ * The result's `status` is "updated" when a release was installed, "available"
+ * when a dry run found one to install, "waiting" when the only newer release
+ * is too recent to be taken up yet, "current" when there is nothing newer,
+ * "busy" when another check is still running, and "failed" with an `error`.
+ */
+export async function checkForUpdate({ force = false, dryRun = false } = {}) {
+    if (updateState.busy) {
+        return { status: "busy", current: null, target: null, latest: null, latestPublishedAt: null, eligibleAt: null, error: null };
+    }
+    updateState.busy = true;
+
+    const result = { status: "failed", current: null, target: null, latest: null, latestPublishedAt: null, eligibleAt: null, error: null };
+    try {
+        result.current = await getInstalledVersion();
+
+        const releases = await fetchReleases();
+        const latest = releases[0] ?? null;
+        const target = selectRelease(releases, { force });
+
+        result.latest = latest?.version ?? null;
+        result.latestPublishedAt = latest?.publishedAt ?? null;
+        result.eligibleAt = latest ? latest.publishedAt + MIN_RELEASE_AGE_MS : null;
+
+        const isNewer = release => release !== null &&
+            (result.current === null || compareVersions(release.version, result.current) > 0);
+
+        if (!isNewer(target)) {
+            result.status = isNewer(latest) ? "waiting" : "current";
+        } else if (dryRun) {
+            result.status = "available";
+            result.target = target.version;
+        } else {
+            await installRelease(target);
+            result.status = "updated";
+            result.target = target.version;
+        }
+    } catch (err) {
+        result.status = "failed";
+        result.error = err.message;
+    } finally {
+        updateState.busy = false;
     }
 
+    if (!dryRun) {
+        updateState.lastCheckAt = Date.now();
+        updateState.lastResult = result;
+    }
+    return result;
+}
+
+export function getUpdateState() {
+    return {
+        ...updateState,
+        minReleaseAgeMs: MIN_RELEASE_AGE_MS,
+        checkIntervalMs: UPDATE_CHECK_INTERVAL_MS,
+        running: autoUpdateTimer !== null,
+    };
+}
+
+/**
+ * Make sure there is a yt-dlp to run before the bot starts. A first install
+ * takes the newest release that has been out for the minimum age, or failing
+ * that the newest there is, since having none is not an option. An existing
+ * binary is brought up to date by the same rule the scheduled check follows.
+ */
+export async function downloadExecutable() {
+    if (existsSync(exePath)) {
+        const result = await checkForUpdate();
+        if (result.status === "updated") {
+            console.info(`[INFO] Yt-dlp updated from ${result.current ?? "an unknown version"} to ${result.target}.`);
+        } else if (result.status === "failed") {
+            console.warn(`[WARN] Yt-dlp update check failed, using existing binary: ${result.error}`);
+        }
+    } else {
+        console.info("[INFO] Downloading yt-dlp...");
+        const releases = await fetchReleases();
+        const release = selectRelease(releases) ?? selectRelease(releases, { force: true });
+        if (release === null) {
+            throw new Error("No yt-dlp release is available for this platform.");
+        }
+
+        await installRelease(release);
+        console.info(`[INFO] Yt-dlp downloaded (release: ${release.version}).`);
+    }
+
+    const version = await getInstalledVersion();
+    if (version !== null) {
+        console.info(`[INFO] Using yt-dlp version: ${version}`);
+    }
 }
 
 export const exec = (url, options = {}, spawnOptions = {}, cookiesPath = null) => spawn(exePath, args(url, options, cookiesPath), {
@@ -152,60 +305,26 @@ export const exec = (url, options = {}, spawnOptions = {}, cookiesPath = null) =
     ...spawnOptions
 });
 
+/**
+ * Check for a release to take up once an hour. Nothing waits for the bot to be
+ * idle: an update is renamed into place, which does not disturb a yt-dlp that
+ * is running, and where the system refuses that the next check tries again.
+ */
 export function startAutoUpdater(client) {
     if (autoUpdateTimer) return;
 
-    console.info("[yt-dlp AutoUpdater] Scheduled auto-updater started (interval: 30 min).");
+    const logger = client?.logger ?? console;
+    logger.info("[yt-dlp AutoUpdater] Checking for updates every hour; a release is installed once it has been out for 24 hours.");
 
     autoUpdateTimer = setInterval(async () => {
-        if (isAutoUpdating) return;
+        const result = await checkForUpdate();
 
-        try {
-            const hasActiveQueues = client.guilds.cache.some(g => g.queue?.playing === true);
-            if (hasActiveQueues) {
-                return;
-            }
-
-            if (!existsSync(exePath)) return;
-            const stat = statSync(exePath);
-            const ageMs = Date.now() - stat.mtimeMs;
-            if (ageMs < AUTO_UPDATE_MIN_BINARY_AGE_MS) return;
-
-            const releases = await got.get("https://api.github.com/repos/yt-dlp/yt-dlp/releases?per_page=1", {
-                timeout: { request: 15_000 },
-            }).json();
-            const release = releases[0];
-            if (!release) return;
-
-            const { execFileSync } = await import("node:child_process");
-            let currentVersion = "";
-            try {
-                currentVersion = execFileSync(exePath, ["--version"], { timeout: 5000 }).toString().trim();
-            } catch {}
-
-            const latestVersion = release.tag_name.replace(/^v/, "");
-            if (currentVersion === latestVersion) return;
-
-            console.info(`[yt-dlp AutoUpdater] New version available: ${currentVersion} -> ${latestVersion}. Updating...`);
-            isAutoUpdating = true;
-
-            const asset = release.assets.find(ast => ast.name === filename);
-            if (!asset) {
-                console.warn("[yt-dlp AutoUpdater] No matching asset found for platform.");
-                return;
-            }
-
-            const buffer = await got.get(asset.browser_download_url, { timeout: { request: 60_000 } }).buffer();
-            mkdirSync(scriptsPath, { recursive: true });
-            writeFileSync(exePath, buffer, { mode: 0o777 });
-
-            console.info(`[yt-dlp AutoUpdater] Updated to ${latestVersion} while bot was idle.`);
-        } catch (err) {
-            console.warn(`[yt-dlp AutoUpdater] Update check failed: ${err.message}`);
-        } finally {
-            isAutoUpdating = false;
+        if (result.status === "updated") {
+            logger.info(`[yt-dlp AutoUpdater] Updated from ${result.current ?? "an unknown version"} to ${result.target}.`);
+        } else if (result.status === "failed") {
+            logger.warn(`[yt-dlp AutoUpdater] Update check failed: ${result.error}`);
         }
-    }, AUTO_UPDATE_CHECK_INTERVAL_MS);
+    }, UPDATE_CHECK_INTERVAL_MS);
 }
 
 export function stopAutoUpdater() {

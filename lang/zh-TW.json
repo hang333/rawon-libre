@@ -117,6 +117,20 @@
                     "disabled": "停用"
                 },
                 "resetAll": "所有機器人設定已重設為預設值。"
+            },
+            "ytdlp": {
+                "description": "檢查或更新 yt-dlp",
+                "usage": "{prefix}ytdlp <status | update>",
+                "slashStatusDescription": "顯示已安裝的 yt-dlp 版本以及自動更新的安排",
+                "slashUpdateDescription": "立即安裝最新的 yt-dlp 版本",
+                "checking": "正在檢查 yt-dlp 的發佈版本…",
+                "current": "已安裝 yt-dlp {version}，已是最新版本。",
+                "available": "已安裝 yt-dlp {version}。{target} 發佈已滿一天，將在下一次整點檢查時自動安裝；使用 {command} 可立即安裝。",
+                "waiting": "已安裝 yt-dlp {version}。{latest} 發佈於 {released}，發佈滿 24 小時後（{eligible}）會自動安裝；使用 {command} 可立即安裝。",
+                "updated": "yt-dlp 已從 {from} 更新到 {to}。",
+                "busy": "已有一次更新檢查正在進行，請稍後再試。",
+                "failed": "無法檢查或更新 yt-dlp：{reason}",
+                "unknownVersion": "未知"
             }
         },
         "general": {

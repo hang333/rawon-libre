@@ -244,6 +244,47 @@ interface YTFlags {
     convertSubs?: string
 }
 
+/** A published release that this platform can run. */
+export type YtDlpRelease = {
+    version: string;
+    /** Milliseconds since the epoch. */
+    publishedAt: number;
+    url: string;
+};
+
+export type YtDlpUpdateResult = {
+    status: "available" | "busy" | "current" | "failed" | "updated" | "waiting";
+    /** The version installed when the check began. */
+    current: string | null;
+    /** The version that was installed, or that a dry run would install. */
+    target: string | null;
+    /** The newest release there is, whether or not it is old enough to take up. */
+    latest: string | null;
+    latestPublishedAt: number | null;
+    /** When `latest` will have been out long enough for the scheduled update. */
+    eligibleAt: number | null;
+    error: string | null;
+};
+
+export function compareVersions(a: string, b: string): number;
+export function usableReleases(releases: unknown): YtDlpRelease[];
+export function selectRelease(
+    releases: YtDlpRelease[],
+    options?: { force?: boolean; now?: number; minAgeMs?: number },
+): YtDlpRelease | null;
+export function getInstalledVersion(): Promise<string | null>;
+export function checkForUpdate(options?: {
+    force?: boolean;
+    dryRun?: boolean;
+}): Promise<YtDlpUpdateResult>;
+export function getUpdateState(): {
+    busy: boolean;
+    lastCheckAt: number | null;
+    lastResult: YtDlpUpdateResult | null;
+    minReleaseAgeMs: number;
+    checkIntervalMs: number;
+    running: boolean;
+};
 export function downloadExecutable(): Promise<void>;
 export function exec(url: string, options?: YTFlags, spawnOptions?: SpawnOptions, cookiesPath?: string | null): ChildProcess;
 export function setCookiesManager(manager: CookiesManager): void;
