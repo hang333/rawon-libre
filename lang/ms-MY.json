@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Paparkan saluran permintaan semasa",
                 "slashChannelDescription": "Saluran yang mahu dijadikan saluran permintaan",
                 "usage": "{prefix}requestchannel <set | remove | status> [saluran]"
+            },
+            "previous": {
+                "description": "Kembali ke lagu sebelumnya",
+                "playing": "Kembali ke {song}",
+                "restarted": "Tiada lagu sebelumnya, jadi {song} dimainkan semula dari awal.",
+                "noPrevious": "Tiada lagu sebelumnya untuk dimainkan semula."
+            },
+            "clear": {
+                "description": "Kosongkan giliran dan kekalkan lagu semasa",
+                "nothing": "Tiada lagu yang menunggu dalam giliran untuk dikosongkan."
+            },
+            "move": {
+                "description": "Alihkan lagu ke kedudukan lain dalam giliran",
+                "usage": "{prefix}move <dari> <ke>",
+                "slashFromDescription": "Kedudukan lagu yang hendak dialihkan dalam giliran",
+                "slashToDescription": "Kedudukan baharu dalam giliran",
+                "moved": "{song} dialihkan ke kedudukan {position}.",
+                "invalid": "Berikan dua kedudukan berbeza daripada senarai giliran. Lagu yang sedang dimainkan tidak boleh dialihkan, dan tiada lagu boleh diletakkan di hadapannya."
+            },
+            "playNext": {
+                "description": "Tambah lagu untuk dimainkan sejurus selepas lagu semasa",
+                "usage": "{prefix}playnext <carian | url | fail lampiran>"
+            },
+            "leave": {
+                "description": "Hentikan pemain muzik dan keluar dari saluran suara"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "Tiada saluran permintaan yang ditetapkan.",
         "currentChannel": "Saluran permintaan sekarang: {channel}",
         "skipInProgress": "Sila tunggu, proses melangkau sedang berjalan.",
-        "noPermission": "Anda tidak mempunyai kebenaran untuk melakukan tindakan ini. Hanya DJ, pengelola server, atau pemohon lagu yang dapat melakukan ini."
+        "noPermission": "Anda tidak mempunyai kebenaran untuk melakukan tindakan ini. Hanya DJ, pengelola server, atau pemohon lagu yang dapat melakukan ini.",
+        "ends": "Tamat {time}",
+        "upNext": "Seterusnya",
+        "jumpPlaceholder": "Langkau ke lagu dalam giliran",
+        "addModalTitle": "Tambah ke giliran",
+        "addModalLabel": "Nama lagu atau URL"
     },
     "reusable": {
         "invalidUsage": "Penggunaan tidak sah, sila gunakan {prefix} {name} untuk maklumat lanjut.",

@@ -1,7 +1,8 @@
 import { URL } from "node:url";
-import { Playlist, type SearchResult, type Video, type VideoCompact } from "youtubei";
+import { Playlist, type Video } from "youtubei";
 import { type Rawon } from "../../../structures/Rawon.js";
 import {
+    type BasicYoutubeVideoInfo,
     type PlaylistMetadata,
     type SearchProgressReporter,
     type SearchTrackResult,
@@ -16,8 +17,139 @@ import {
     pickBestThumbnail,
 } from "../../functions/thumbnails.js";
 import { youtube, youtubeMusic } from "../YouTubeUtil.js";
-import { getInfo } from "../YTDLUtil.js";
+import { getInfo, getInfoEntries, searchBilibili } from "../YTDLUtil.js";
 import { checkQuery } from "./checkQuery.js";
+
+/** Hits looked up per Bilibili search. Each one costs a run of yt-dlp. */
+const BILIBILI_CANDIDATES = 3;
+/** Bilibili searches that may run at once, however many tracks wait on one. */
+const BILIBILI_CONCURRENCY = 2;
+/**
+ * Tracks of one playlist that may be looked for on Bilibili. Past this the
+ * rest are left out, as every unmatched track was before, rather than keeping
+ * a request waiting for minutes when YouTube is failing for all of them.
+ */
+const BILIBILI_COLLECTION_BUDGET = 30;
+
+let bilibiliRunning = 0;
+const bilibiliWaiting: (() => void)[] = [];
+
+async function withBilibiliSlot<Result>(task: () => Promise<Result>): Promise<Result> {
+    if (bilibiliRunning < BILIBILI_CONCURRENCY) {
+        bilibiliRunning++;
+    } else {
+        // Whoever finishes hands its slot over, so the count stays as it is.
+        await new Promise<void>((resolve) => {
+            bilibiliWaiting.push(resolve);
+        });
+    }
+
+    try {
+        return await task();
+    } finally {
+        const next = bilibiliWaiting.shift();
+        if (next === undefined) {
+            bilibiliRunning--;
+        } else {
+            next();
+        }
+    }
+}
+
+/**
+ * Look on Bilibili for something YouTube did not have. Empty when the fallback
+ * is switched off or the search fails: the request then ends as it would have
+ * without it.
+ */
+async function searchBilibiliEntries(
+    client: Rawon,
+    query: string,
+): Promise<BasicYoutubeVideoInfo[]> {
+    if (!client.config.bilibiliFallback || query.trim().length === 0) {
+        return [];
+    }
+
+    try {
+        return await withBilibiliSlot(async () => searchBilibili(query, BILIBILI_CANDIDATES));
+    } catch (error) {
+        client.logger.warn(
+            `[searchTrack] Bilibili fallback search failed: ${(error as Error).message}`,
+        );
+        return [];
+    }
+}
+
+function toBilibiliSong(entry: BasicYoutubeVideoInfo): Song {
+    return {
+        duration: entry.is_live ? 0 : (entry.duration ?? 0),
+        id: entry.id ?? "",
+        thumbnail: pickBestThumbnail(entry.thumbnails),
+        title: entry.title ?? "Unknown Song",
+        url: entry.webpage_url ?? entry.url,
+        isLive: entry.is_live,
+    };
+}
+
+/** A search result, reduced to what it can be judged on. Duration in seconds. */
+type MatchCandidate = {
+    title: string;
+    /** Who the listing says it is by: a channel, an uploader. */
+    by: string;
+    duration?: number | null;
+};
+
+/**
+ * How well a search result fits a Spotify track. The track's name in the title
+ * and an artist's name on the listing count once each; an auto-generated
+ * "Topic" channel, which carries the label's own audio, and a length within
+ * five seconds of the track's count twice.
+ */
+function scoreMatch(track: SpotifyTrack, candidate: MatchCandidate): number {
+    const title = candidate.title.toLowerCase();
+    const by = candidate.by.toLowerCase();
+    let score = 0;
+
+    if (title.includes(track.name.toLowerCase())) {
+        score += 1;
+    }
+    if (
+        track.artists.some(
+            (artist) => artist.name.length > 0 && by.includes(artist.name.toLowerCase()),
+        )
+    ) {
+        score += 1;
+    }
+    if (by.endsWith("- topic")) {
+        score += 2;
+    }
+
+    // Spotify counts in milliseconds, a search result in seconds.
+    const length = candidate.duration ?? 0;
+    if (length > 0 && Math.abs(length - track.duration_ms / 1_000) <= 5) {
+        score += 2;
+    }
+
+    return score;
+}
+
+/** The best-fitting candidate. Equal scores keep the order the search gave. */
+function bestMatch<Candidate>(
+    track: SpotifyTrack,
+    candidates: Candidate[],
+    describe: (candidate: Candidate) => MatchCandidate,
+): Candidate | undefined {
+    return [...candidates].sort(
+        (a, b) => scoreMatch(track, describe(b)) - scoreMatch(track, describe(a)),
+    )[0];
+}
+
+/**
+ * SoundCloud reports a track's length in milliseconds; every other source, and
+ * everything that reads a song's duration, works in seconds.
+ */
+function soundCloudSeconds(milliseconds: number | null | undefined): number {
+    return Math.round((milliseconds ?? 0) / 1_000);
+}
 
 function extractVideoId(url: URL): string | null {
     if (/youtu\.be/gu.test(url.hostname)) {
@@ -104,7 +236,7 @@ export async function searchTrack(
 
                         result.items = [
                             {
-                                duration: track.full_duration,
+                                duration: soundCloudSeconds(track.full_duration),
                                 id: track.id.toString(),
                                 thumbnail: getSoundCloudThumbnail(
                                     track.artwork_url ?? track.user?.avatar_url,
@@ -120,7 +252,7 @@ export async function searchTrack(
                         const playlist = await client.soundcloud.playlists.get(scUrl.toString());
                         const tracks = playlist.tracks.map(
                             (track): Song => ({
-                                duration: track.full_duration,
+                                duration: soundCloudSeconds(track.full_duration),
                                 id: track.id.toString(),
                                 thumbnail: getSoundCloudThumbnail(
                                     track.artwork_url ?? track.user?.avatar_url,
@@ -270,93 +402,64 @@ export async function searchTrack(
             }
 
             case "spotify": {
-                function sortVideos(
-                    track: SpotifyTrack,
-                    videos: SearchResult<"video">,
-                ): VideoCompact[] {
-                    return videos.items.sort((a, b) => {
-                        let aValue = 0;
-                        let bValue = 0;
-                        const aDurationDiff =
-                            (a.duration ?? 0) > 0 ? (a.duration ?? 0) - track.duration_ms : null;
-                        const bDurationDiff =
-                            (b.duration ?? 0) > 0 ? (b.duration ?? 0) - track.duration_ms : null;
+                let bilibiliBudget = BILIBILI_COLLECTION_BUDGET;
 
-                        if (a.title.toLowerCase().includes(track.name.toLowerCase())) {
-                            aValue--;
-                        }
-                        if (
-                            track.artists.some(
-                                (x) => a.channel?.name.toLowerCase().includes(x.name) === true,
-                            )
-                        ) {
-                            aValue--;
-                        }
-                        if (a.channel?.name.endsWith("- Topic") === true) {
-                            aValue -= 2;
-                        }
-                        if (
-                            aDurationDiff !== null &&
-                            aDurationDiff <= 5_000 &&
-                            aDurationDiff >= -5_000
-                        ) {
-                            aValue -= 2;
-                        }
+                async function matchOnYouTube(track: SpotifyTrack): Promise<Song | null> {
+                    const byName = `${track.artists.map((y) => y.name).join(", ")} - ${track.name}`;
+                    const isrc = track.external_ids?.isrc;
 
-                        if (b.title.toLowerCase().includes(track.name.toLowerCase())) {
-                            bValue++;
-                        }
-                        if (
-                            track.artists.some(
-                                (x) => b.channel?.name.toLowerCase().includes(x.name) === true,
-                            )
-                        ) {
-                            bValue++;
-                        }
-                        if (b.channel?.name.endsWith(" - Topic") === true) {
-                            bValue += 2;
-                        }
-                        if (
-                            bDurationDiff !== null &&
-                            bDurationDiff <= 5_000 &&
-                            bDurationDiff >= -5_000
-                        ) {
-                            bValue += 2;
-                        }
-
-                        return aValue + bValue;
-                    });
-                }
-
-                async function resolveSpotifyTrack(track: SpotifyTrack): Promise<Song | null> {
                     try {
-                        let response = await youtube.search(
-                            track.external_ids?.isrc ??
-                                `${track.artists.map((y) => y.name).join(", ")} - ${track.name}`,
-                            { type: "video" },
-                        );
-                        if (response.items.length === 0) {
-                            response = await youtube.search(
-                                `${track.artists.map((y) => y.name).join(", ")} - ${track.name}`,
-                                { type: "video" },
-                            );
+                        let response = await youtube.search(isrc ?? byName, { type: "video" });
+                        if (response.items.length === 0 && isrc !== undefined) {
+                            response = await youtube.search(byName, { type: "video" });
                         }
 
-                        const matches = sortVideos(track, response);
-                        if (matches.length === 0) {
-                            return null;
-                        }
+                        const match = bestMatch(track, response.items, (video) => ({
+                            title: video.title,
+                            by: video.channel?.name ?? "",
+                            duration: video.duration,
+                        }));
 
-                        return {
-                            duration: matches[0].duration ?? 0,
-                            id: matches[0].id,
-                            thumbnail: getYouTubeThumbnail(matches[0].id),
-                            title: matches[0].title,
-                            url: `https://youtube.com/watch?v=${matches[0].id}`,
-                        };
+                        return match === undefined ? null : toYouTubeSong(match);
                     } catch {
                         return null;
                     }
+                }
+
+                async function matchOnBilibili(track: SpotifyTrack): Promise<Song | null> {
+                    if (bilibiliBudget <= 0) {
+                        return null;
+                    }
+                    bilibiliBudget--;
+
+                    const entries = await searchBilibiliEntries(
+                        client,
+                        `${track.artists.map((y) => y.name).join(" ")} ${track.name}`,
+                    );
+                    // Uploads there are rarely the artist's own; the artist is
+                    // named in the title, if anywhere.
+                    const describe = (entry: BasicYoutubeVideoInfo): MatchCandidate => ({
+                        title: entry.title ?? "",
+                        by: `${entry.uploader ?? ""} ${entry.title ?? ""}`,
+                        duration: entry.duration,
+                    });
+                    const match = bestMatch(track, entries, describe);
+
+                    // YouTube was asked for this very recording; a keyword search
+                    // answers with whatever is nearest. A hit that shares neither
+                    // the track's name, nor its artist, nor its length is not it.
+                    if (match === undefined || scoreMatch(track, describe(match)) === 0) {
+                        return null;
+                    }
+
+                    client.logger.info(
+                        `[searchTrack] No YouTube match for "${track.name}", using Bilibili: ${match.title}`,
+                    );
+                    return toBilibiliSong(match);
+                }
+
+                async function resolveSpotifyTrack(track: SpotifyTrack): Promise<Song | null> {
+                    return (await matchOnYouTube(track)) ?? matchOnBilibili(track);
                 }
 
                 switch (queryData.type) {
@@ -411,7 +514,30 @@ export async function searchTrack(
             }
 
             default: {
-                const info = await getInfo(url.toString(), client).catch(() => void 0);
+                const entries = await getInfoEntries(url.toString(), client).catch(() => []);
+
+                // One link, several tracks: each part is queued under its own page.
+                if (entries.length > 1) {
+                    result.items = entries.map(
+                        (entry): Song => ({
+                            duration: entry.is_live ? 0 : (entry.duration ?? 0),
+                            id: entry.id ?? "",
+                            thumbnail: pickBestThumbnail(entry.thumbnails),
+                            title: entry.title ?? "Unknown Song",
+                            url: entry.webpage_url ?? entry.url ?? url.toString(),
+                            isLive: entry.is_live,
+                        }),
+                    );
+                    result.playlist = {
+                        title: entries[0].playlist_title ?? entries[0].title ?? "Unknown",
+                        url: url.toString(),
+                        thumbnail: result.items[0].thumbnail || undefined,
+                        author: entries[0].uploader,
+                    };
+                    break;
+                }
+
+                const info = entries[0] as BasicYoutubeVideoInfo | undefined;
 
                 result.items = [
                     {
@@ -435,7 +561,7 @@ export async function searchTrack(
             });
             const tracks = searchRes.collection.map(
                 (track): Song => ({
-                    duration: track.full_duration,
+                    duration: soundCloudSeconds(track.full_duration),
                     id: track.id.toString(),
                     thumbnail: getSoundCloudThumbnail(track.artwork_url ?? track.user?.avatar_url),
                     title: track.title,
@@ -455,6 +581,11 @@ export async function searchTrack(
             }
             if (tracks.length === 0) {
                 tracks = await searchYouTubeVideos(query).catch(() => []);
+            }
+            // Nothing on YouTube, or YouTube not answering: Bilibili is asked
+            // before the search is given up as empty.
+            if (tracks.length === 0) {
+                tracks = (await searchBilibiliEntries(client, query)).map(toBilibiliSong);
             }
             result.items = tracks;
         }

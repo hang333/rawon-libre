@@ -38,6 +38,10 @@ export type BasicYoutubeVideoInfo = {
     url: string;
     id: string;
     is_live?: boolean;
+    /** The page an entry came from: the link to queue for one part of several. */
+    webpage_url?: string;
+    playlist_title?: string;
+    uploader?: string;
 };
 
 export type PlaylistMetadata = {

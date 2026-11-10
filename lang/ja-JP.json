@@ -361,6 +361,31 @@
                 "slashStatusDescription": "現在のリクエストチャンネルを表示",
                 "slashChannelDescription": "リクエストチャンネルとして設定するチャンネル",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "前の曲に戻る",
+                "playing": "{song} に戻りました",
+                "restarted": "前の曲がないため、{song} を最初から再生します。",
+                "noPrevious": "戻れる前の曲がありません。"
+            },
+            "clear": {
+                "description": "再生中の曲を残してキューを空にする",
+                "nothing": "キューに待機中の曲がありません。"
+            },
+            "move": {
+                "description": "曲をキュー内の別のポジションへ移動",
+                "usage": "{prefix}move <移動元> <移動先>",
+                "slashFromDescription": "移動する曲のキュー内のポジション",
+                "slashToDescription": "移動先のキュー内のポジション",
+                "moved": "{song} をポジション {position} に移動しました。",
+                "invalid": "キューリストにある、異なる 2 つのポジションを指定してください。再生中の曲は移動できず、その前に曲を置くこともできません。"
+            },
+            "playNext": {
+                "description": "再生中の曲のすぐ次に再生する曲を追加",
+                "usage": "{prefix}playnext <キーワード | URL | 添付ファイル>"
+            },
+            "leave": {
+                "description": "プレイヤーをストップしてボイスチャンネルから退出"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "現在リクエストチャンネルは設定されていません。",
         "currentChannel": "現在のリクエストチャンネル: {channel}",
         "skipInProgress": "お待ちください、スキップ操作が進行中です。",
-        "noPermission": "このアクションを実行する権限がありません。DJロール、サーバー管理者、または曲をリクエストした人だけが実行できます。"
+        "noPermission": "このアクションを実行する権限がありません。DJロール、サーバー管理者、または曲をリクエストした人だけが実行できます。",
+        "ends": "{time}に終了",
+        "upNext": "次の曲",
+        "jumpPlaceholder": "キュー内の曲へジャンプ",
+        "addModalTitle": "キューに追加",
+        "addModalLabel": "曲名または URL"
     },
     "reusable": {
         "invalidUsage": "無効な使用方法です。{prefix} {name}を実行して情報を照会してください。",

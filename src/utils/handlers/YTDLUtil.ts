@@ -503,6 +503,85 @@ export async function getInfo(url: string, client?: Rawon): Promise<BasicYoutube
     return attemptGetInfoWithRetry(url, client, 0);
 }
 
+/**
+ * Everything a URL resolves to. yt-dlp prints one JSON document per entry, so a
+ * link that holds several (a multi-part Bilibili video, a playlist on a site
+ * with no handling of its own here) comes back as several lines, which do not
+ * parse as a single object and reach this point as the raw text.
+ */
+export async function getInfoEntries(
+    url: string,
+    client?: Rawon,
+): Promise<BasicYoutubeVideoInfo[]> {
+    return parseInfoLines(await getInfo(url, client));
+}
+
+function parseInfoLines(result: unknown): BasicYoutubeVideoInfo[] {
+    if (typeof result !== "string") {
+        return typeof result === "object" && result !== null
+            ? [result as BasicYoutubeVideoInfo]
+            : [];
+    }
+
+    const entries: BasicYoutubeVideoInfo[] = [];
+    for (const line of result.split("\n")) {
+        try {
+            const entry = JSON.parse(line) as unknown;
+            if (typeof entry === "object" && entry !== null) {
+                entries.push(entry as BasicYoutubeVideoInfo);
+            }
+        } catch {
+            // Not a JSON line: blank, or noise the extractor let through.
+        }
+    }
+
+    return entries;
+}
+
+/**
+ * A Bilibili search is only ever a second attempt at a request, so it is given
+ * a deadline and no retries: when it does not answer, the request fails the
+ * way it would have without it.
+ */
+const BILIBILI_SEARCH_TIMEOUT_MS = 20_000;
+
+/**
+ * Search Bilibili by keyword. yt-dlp's search yields bare links, so each hit is
+ * then looked up for its title and length; a lookup that fails only costs that
+ * one hit. Multi-part uploads are left out: a collection is not an answer to a
+ * request for one track.
+ */
+export async function searchBilibili(
+    query: string,
+    limit: number,
+): Promise<BasicYoutubeVideoInfo[]> {
+    const options = { dumpJson: true, addHeader: BILIBILI_USER_AGENT_HEADER };
+    const spawnOptions = { timeout: BILIBILI_SEARCH_TIMEOUT_MS };
+
+    const hits = parseInfoLines(
+        await ytdl(`bilisearch${limit}:${query}`, { ...options, flatPlaylist: true }, spawnOptions),
+    );
+
+    const found = await Promise.all(
+        hits.slice(0, limit).map(async (hit): Promise<BasicYoutubeVideoInfo | null> => {
+            const url = (hit.url ?? "").replace(/^http:/u, "https:");
+            if (url.length === 0) {
+                return null;
+            }
+
+            const entries = await ytdl(url, options, spawnOptions)
+                .then(parseInfoLines)
+                .catch(() => []);
+
+            return entries.length === 1
+                ? { ...entries[0], webpage_url: entries[0].webpage_url ?? url }
+                : null;
+        }),
+    );
+
+    return found.filter((entry): entry is BasicYoutubeVideoInfo => entry !== null);
+}
+
 async function attemptGetInfoWithRetry(
     url: string,
     client?: Rawon,

@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Cek channel request sekarang",
                 "slashChannelDescription": "Channel yang mau diset jadi channel request",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Balik ke lagu sebelumnya",
+                "playing": "Balik ke lagu {song}",
+                "restarted": "Nggak ada lagu sebelumnya, jadi {song} diulang dari awal.",
+                "noPrevious": "Nggak ada lagu sebelumnya buat diputar lagi."
+            },
+            "clear": {
+                "description": "Kosongin antrian, lagu yang lagi diputar tetap jalan",
+                "nothing": "Nggak ada lagu yang nunggu di antrian buat dihapus."
+            },
+            "move": {
+                "description": "Pindahin lagu ke posisi lain di antrian",
+                "usage": "{prefix}move <dari> <ke>",
+                "slashFromDescription": "Posisi lagu yang mau dipindahin di antrian",
+                "slashToDescription": "Posisi tujuan di antrian",
+                "moved": "{song} dipindahin ke posisi {position}.",
+                "invalid": "Kasih dua posisi berbeda dari daftar antrian. Lagu yang lagi diputar nggak bisa dipindahin, dan nggak ada yang bisa ditaruh di depannya."
+            },
+            "playNext": {
+                "description": "Tambahin lagu buat diputar tepat setelah lagu sekarang",
+                "usage": "{prefix}playnext <kata pencarian / link / file terlampir>"
+            },
+            "leave": {
+                "description": "Stop media player dan keluar dari voice channel"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "Gak ada channel request yang diset sekarang.",
         "currentChannel": "Channel request sekarang: {channel}",
         "skipInProgress": "Bentar ya, skip lagi jalan.",
-        "noPermission": "Kamu gak punya izin buat ngelakuin ini. Cuma role DJ, admin server, atau yang request lagu yang bisa."
+        "noPermission": "Kamu gak punya izin buat ngelakuin ini. Cuma role DJ, admin server, atau yang request lagu yang bisa.",
+        "ends": "Selesai {time}",
+        "upNext": "Selanjutnya",
+        "jumpPlaceholder": "Loncat ke lagu di antrian",
+        "addModalTitle": "Tambahin ke antrian",
+        "addModalLabel": "Judul lagu atau link"
     },
     "reusable": {
         "invalidUsage": "Cara pakenya salah, coba pake {prefix} {name} buat info lebih lanjut.",

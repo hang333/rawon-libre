@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Hiển thị kênh yêu cầu hiện tại",
                 "slashChannelDescription": "Kênh để đặt làm kênh yêu cầu",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Quay lại bài hát trước",
+                "playing": "Đã quay lại {song}",
+                "restarted": "Không có bài hát trước, nên {song} được phát lại từ đầu.",
+                "noPrevious": "Không có bài hát trước nào để quay lại."
+            },
+            "clear": {
+                "description": "Xóa hàng đợi, giữ lại bài hát đang phát",
+                "nothing": "Không có bài hát nào đang chờ trong hàng đợi để xóa."
+            },
+            "move": {
+                "description": "Chuyển một bài hát sang vị trí khác trong hàng đợi",
+                "usage": "{prefix}move <từ> <đến>",
+                "slashFromDescription": "Vị trí trong hàng đợi của bài hát cần chuyển",
+                "slashToDescription": "Vị trí trong hàng đợi để chuyển tới",
+                "moved": "Đã chuyển {song} tới vị trí {position}.",
+                "invalid": "Hãy nhập hai vị trí khác nhau trong danh sách hàng đợi. Không thể chuyển bài hát đang phát, và không thể đặt bài nào lên trước nó."
+            },
+            "playNext": {
+                "description": "Thêm một bài hát để phát ngay sau bài hiện tại",
+                "usage": "{prefix}playnext <truy vấn | url | tệp đính kèm>"
+            },
+            "leave": {
+                "description": "Dừng phát nhạc và rời kênh thoại"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "Hiện không có kênh yêu cầu nào được đặt.",
         "currentChannel": "Kênh yêu cầu hiện tại: {channel}",
         "skipInProgress": "Vui lòng đợi, thao tác bỏ qua đang được thực hiện.",
-        "noPermission": "Bạn không có quyền thực hiện hành động này. Chỉ có vai trò DJ, quản lý máy chủ hoặc người yêu cầu bài hát mới có thể thực hiện."
+        "noPermission": "Bạn không có quyền thực hiện hành động này. Chỉ có vai trò DJ, quản lý máy chủ hoặc người yêu cầu bài hát mới có thể thực hiện.",
+        "ends": "Kết thúc {time}",
+        "upNext": "Tiếp theo",
+        "jumpPlaceholder": "Chuyển tới một bài hát trong hàng đợi",
+        "addModalTitle": "Thêm vào hàng đợi",
+        "addModalLabel": "Tên bài hát hoặc URL"
     },
     "reusable": {
         "invalidUsage": "Cách sử dụng không hợp lệ, vui lòng nhập {prefix} {name} để biết thêm thông tin.",

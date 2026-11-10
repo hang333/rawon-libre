@@ -160,17 +160,14 @@ export class CommandContext {
             throw new Error("Interaction is already replied.");
         }
 
-        const context = this.context as CommandInteraction | Message | StringSelectMenuInteraction;
+        // An interaction can be answered once; after that, or after it has been
+        // deferred, the answer is edited. That holds for a button or a dialog as
+        // much as for a command.
+        const interaction = this.isInteraction() ? (this.context as CommandInteraction) : null;
         const rep = await this.send(
             options,
-            this.isInteraction()
-                ? (context as Interaction).isCommand() ||
-                  (context as Interaction).isStringSelectMenu()
-                    ? (context as CommandInteraction).replied ||
-                      (context as CommandInteraction).deferred
-                        ? "editReply"
-                        : "reply"
-                    : "reply"
+            interaction !== null && (interaction.replied || interaction.deferred)
+                ? "editReply"
                 : "reply",
         ).catch((error: unknown) => ({ error }));
         if ("error" in rep) {

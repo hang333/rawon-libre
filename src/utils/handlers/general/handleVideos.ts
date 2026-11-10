@@ -41,6 +41,7 @@ export async function handleVideos(
     toQueue: Song[],
     voiceChannel: StageChannel | VoiceChannel,
     playlistMeta?: PlaylistMetadata,
+    placeNext = false,
 ): Promise<Message | undefined> {
     const wasIdle = ctx.guild?.queue?.idle;
     const inRequestChannel = isRequestChannel(client, ctx);
@@ -49,8 +50,17 @@ export async function handleVideos(
     const __mf = i18n__mf(client, ctx.guild);
 
     async function sendConfirmation(): Promise<Message | undefined> {
+        const queue = ctx.guild?.queue;
+        const added: string[] = [];
         for (const song of toQueue) {
-            ctx.guild?.queue?.songs.addSong(song, ctx.member as NonNullable<typeof ctx.member>);
+            const key = queue?.songs.addSong(song, ctx.member as NonNullable<typeof ctx.member>);
+            if (key !== undefined) {
+                added.push(key);
+            }
+        }
+        // `playnext`: the new tracks go to the front of what is still to come.
+        if (placeNext) {
+            queue?.queueNext(added);
         }
 
         if (toQueue.length === 1) {

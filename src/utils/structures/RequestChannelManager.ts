@@ -1,14 +1,6 @@
 import { clearTimeout, setTimeout } from "node:timers";
 import {
-    type AudioPlayerPlayingState,
-    AudioPlayerStatus,
-    type AudioResource,
-} from "@discordjs/voice";
-import {
-    ActionRowBuilder,
     type APIMessageTopLevelComponent,
-    ButtonBuilder,
-    ButtonStyle,
     ChannelType,
     type EmbedBuilder,
     type Guild,
@@ -20,14 +12,11 @@ import {
     type VoiceChannel,
 } from "discord.js";
 import { type Rawon } from "../../structures/Rawon.js";
-import { type QueueSong } from "../../typings/index.js";
 import { createEmbed } from "../functions/createEmbed.js";
-import { formatMarkdownLink } from "../functions/formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "../functions/i18n.js";
-import { formatDuration, normalizeTime } from "../functions/normalizeTime.js";
+import { buildPlayerComponents, buildPlayerEmbed, PanelId } from "../functions/playerPanel.js";
 import {
     type FallbackDataManager,
-    hasGetPlayerState,
     hasGetRequestChannel,
     hasSaveRequestChannel,
 } from "../typeGuards.js";
@@ -45,37 +34,6 @@ export class RequestChannelManager {
     ]);
 
     public constructor(public readonly client: Rawon) {}
-
-    private formatQueueFooter(
-        count: string | number,
-        duration: string,
-        autoPlay: boolean,
-        __: (key: string) => string,
-        __mf: (key: string, values: Record<string, string | number>) => string,
-    ): string {
-        const autoPlayState = autoPlay ? "ON" : "OFF";
-        const footerTemplate = __("requestChannel.queueFooter");
-
-        if (footerTemplate.includes("{state}")) {
-            return `• ${__mf("requestChannel.queueFooter", {
-                count,
-                duration,
-                state: autoPlayState,
-            })}`;
-        }
-
-        const baseFooter = __mf("requestChannel.queueFooter", {
-            count,
-            duration,
-        });
-        const autoPlayInfo = `${__("requestChannel.autoplay").toLowerCase()}: ${autoPlayState}`;
-
-        if (baseFooter.endsWith(")")) {
-            return `• ${baseFooter.slice(0, -1)}, ${autoPlayInfo})`;
-        }
-
-        return `• ${baseFooter} (${autoPlayInfo})`;
-    }
 
     private isPrimaryBot(): boolean {
         if (!this.client.config.isMultiBot) {
@@ -395,204 +353,11 @@ export class RequestChannelManager {
     }
 
     public createPlayerEmbed(guild: Guild): EmbedBuilder {
-        const queue = guild.queue;
-
-        const botId = this.client.user?.id ?? "unknown";
-        let savedState: {
-            loopMode?: string;
-            shuffle?: boolean;
-            autoplay?: boolean;
-            volume?: number;
-            filters?: Record<string, boolean>;
-        } | null = null;
-
-        if (hasGetPlayerState(this.client.data)) {
-            savedState = this.client.data.getPlayerState(guild.id, botId) ?? null;
-        } else {
-            const fallback = this.client.data as FallbackDataManager;
-            savedState = fallback.data?.[guild.id]?.playerState ?? null;
-        }
-
-        const bs = this.client.data.botSettings;
-        // No splash is configured out of the box, and an embed rejects an empty URL.
-        const splash = bs.requestChannelSplash.length > 0 ? bs.requestChannelSplash : null;
-
-        const __ = i18n__(this.client, guild);
-        const __mf = i18n__mf(this.client, guild);
-
-        if (!queue || queue.songs.size === 0) {
-            const savedLoopMode = savedState?.loopMode ?? "OFF";
-            const savedShuffle = savedState?.shuffle ?? false;
-            const savedAutoPlay = savedState?.autoplay ?? false;
-            const savedVolume = savedState?.volume ?? bs.defaultVolume;
-
-            return createEmbed("info", __("requestChannel.standby"))
-                .setTitle(`🎵  ${__("requestChannel.title")}`)
-                .setImage(splash)
-                .addFields([
-                    {
-                        name: __("requestChannel.status"),
-                        value: `▶️ ${savedLoopMode}`,
-                        inline: true,
-                    },
-                    {
-                        name: __("requestChannel.shuffle"),
-                        value: `🔀 ${savedShuffle ? "ON" : "OFF"}`,
-                        inline: true,
-                    },
-                    {
-                        name: __("requestChannel.volume"),
-                        value: `🔊 ${savedVolume}%`,
-                        inline: true,
-                    },
-                ])
-                .setFooter({
-                    text: this.formatQueueFooter(0, "0:00", savedAutoPlay, __, __mf),
-                });
-        }
-
-        const res = (
-            queue.player.state as
-                | (AudioPlayerPlayingState & {
-                      resource: AudioResource | undefined;
-                  })
-                | undefined
-        )?.resource;
-        const queueSong = res?.metadata as QueueSong | undefined;
-        const fallbackQueueSong = queueSong ?? queue.songs.sortByIndex().first();
-        const song = fallbackQueueSong?.song;
-
-        const duration = song?.duration ?? 0;
-        const isLive = song?.isLive === true;
-
-        const loopModeEmoji: Record<string, string> = {
-            OFF: "▶️",
-            SONG: "🔂",
-            QUEUE: "🔁",
-        };
-
-        const statusEmoji =
-            queue.playing || queue.player.state.status !== AudioPlayerStatus.Paused ? "▶️" : "⏸️";
-        const loopEmoji = loopModeEmoji[queue.loopMode] ?? "▶️";
-
-        const hasThumbnail = (song?.thumbnail?.length ?? 0) > 0;
-        const imageUrl = hasThumbnail ? (song?.thumbnail ?? splash) : splash;
-
-        const embed = createEmbed("info")
-            .setTitle(`🎵  ${__("requestChannel.title")}`)
-            .setImage(imageUrl);
-
-        const guildIcon = guild.iconURL({ size: 2_048 });
-        if (guildIcon !== null && guildIcon.length > 0) {
-            embed.setThumbnail(guildIcon);
-        }
-
-        const totalQueueDuration = queue.songs
-            .map((s) => s.song.duration)
-            .reduce((acc, dur) => acc + dur, 0);
-
-        if (song) {
-            let durationLine: string;
-            if (isLive) {
-                durationLine = `🔴 **\`${__("requestChannel.live")}\`**`;
-            } else {
-                const songDurationStr = duration > 0 ? normalizeTime(duration) : "--:--";
-                durationLine = `${statusEmoji} ${__("requestChannel.songDuration")}: **\`${songDurationStr}\`**`;
-            }
-
-            const requesterLine = `${__("requestChannel.requestedBy")}: ${fallbackQueueSong?.requester.toString() ?? __("requestChannel.unknown")}`;
-
-            embed.setDescription(
-                `### ${formatMarkdownLink(song.title, song.url)}\n\n${durationLine}\n\n${requesterLine}`,
-            );
-        } else {
-            const standbyLine = `${statusEmoji} ${__("requestChannel.standby")}`;
-            embed.setDescription(standbyLine);
-        }
-
-        const shuffleState = queue.shuffle ? "ON" : "OFF";
-
-        embed.addFields([
-            {
-                name: __("requestChannel.status"),
-                value: `${loopEmoji} ${queue.loopMode}`,
-                inline: true,
-            },
-            {
-                name: __("requestChannel.shuffle"),
-                value: `🔀 ${shuffleState}`,
-                inline: true,
-            },
-            {
-                name: __("requestChannel.volume"),
-                value: `🔊 ${queue.volume}%`,
-                inline: true,
-            },
-        ]);
-
-        const queueDurationStr =
-            totalQueueDuration > 0 ? formatDuration(totalQueueDuration) : "0:00";
-        embed.setFooter({
-            text: this.formatQueueFooter(
-                queue.songs.size.toString(),
-                queueDurationStr,
-                queue.autoPlay,
-                __,
-                __mf,
-            ),
-        });
-
-        return embed;
+        return buildPlayerEmbed(this.client, guild, "full");
     }
 
     public createPlayerButtons(guild: Guild): APIMessageTopLevelComponent[] {
-        const queue = guild.queue;
-
-        const isPlaying = queue?.playing ?? false;
-
-        const pauseResumeEmoji = isPlaying ? "⏸️" : "▶️";
-
-        const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId("RC_PAUSE_RESUME")
-                .setEmoji(pauseResumeEmoji)
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId("RC_SKIP").setEmoji("⏭️").setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId("RC_STOP").setEmoji("⏹️").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId("RC_LOOP")
-                .setEmoji("🔁")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId("RC_SHUFFLE")
-                .setEmoji("🔀")
-                .setStyle(ButtonStyle.Secondary),
-        );
-
-        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId("RC_VOL_DOWN")
-                .setEmoji("🔉")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId("RC_VOL_UP")
-                .setEmoji("🔊")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId("RC_REMOVE").setEmoji("🗑️").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId("RC_AUTOPLAY")
-                .setEmoji("♾️")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId("RC_LYRICS")
-                .setEmoji("📜")
-                .setStyle(ButtonStyle.Secondary),
-        );
-
-        return [
-            row1.toJSON() as APIMessageTopLevelComponent,
-            row2.toJSON() as APIMessageTopLevelComponent,
-        ];
+        return buildPlayerComponents(this.client, guild, "full");
     }
 
     private hasPlayerControls(message: Message): boolean {
@@ -602,7 +367,8 @@ export class RequestChannelManager {
             }
 
             return row.components.some(
-                (component) => "customId" in component && component.customId === "RC_PAUSE_RESUME",
+                (component) =>
+                    "customId" in component && component.customId === PanelId.PauseResume,
             );
         });
     }
@@ -670,6 +436,10 @@ export class RequestChannelManager {
 
         const performUpdate = async (): Promise<void> => {
             this.pendingUpdates.delete(guild.id);
+
+            // The panel posted in an ordinary text channel shows the same state
+            // and goes stale at the same moments as the request channel's player.
+            void guild.queue?.refreshPanel();
 
             try {
                 const isSecondary = this.client.config.isMultiBot && !this.isPrimaryBot();

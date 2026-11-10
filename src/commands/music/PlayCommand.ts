@@ -78,6 +78,19 @@ export class PlayCommand extends ContextCommand {
     @validVC
     @sameVC
     public async contextRun(ctx: CommandContext): Promise<Message | undefined> {
+        return this.enqueue(ctx);
+    }
+
+    /**
+     * Resolve a request and queue it. Public because `playnext` is the same
+     * request with a different place in the queue, and is allowed in servers
+     * where `play` itself is reserved for the request channel.
+     */
+    public async enqueue(
+        ctx: CommandContext,
+        options: { next?: boolean; commandName?: string } = {},
+    ): Promise<Message | undefined> {
+        const placeNext = options.next === true;
         const localCtx = ctx as CommandContext & LocalCommandContext;
         const member = localCtx.member as GuildMember | null;
         const client = this.getClient(ctx);
@@ -98,7 +111,7 @@ export class PlayCommand extends ContextCommand {
                 .filter((result): result is NonNullable<typeof result> => result !== null)
                 .map((result) => result.items[0]);
 
-            return handleVideos(client, localCtx, toQueue, voiceChannel);
+            return handleVideos(client, localCtx, toQueue, voiceChannel, undefined, placeNext);
         }
 
         const query =
@@ -124,7 +137,7 @@ export class PlayCommand extends ContextCommand {
                         "warn",
                         __mf("reusable.invalidUsage", {
                             prefix: formatBoldPrefixedCommand(prefix, "help"),
-                            name: `**\`${this.options.name}\`**`,
+                            name: `**\`${options.commandName ?? this.options.name}\`**`,
                         }),
                     ),
                 ],
@@ -162,6 +175,8 @@ export class PlayCommand extends ContextCommand {
                 localCtx,
                 await attachmentsToSongs(playableUploads),
                 voiceChannel,
+                undefined,
+                placeNext,
             );
         }
 
@@ -185,12 +200,17 @@ export class PlayCommand extends ContextCommand {
             });
         }
 
+        // A link can hold several tracks without looking like a playlist: a
+        // multi-part Bilibili video is one URL and many parts.
+        const isCollection = isCollectionQuery || songs.playlist !== undefined;
+
         return handleVideos(
             client,
             localCtx,
-            isCollectionQuery ? songs.items : [songs.items[0]],
+            isCollection ? songs.items : [songs.items[0]],
             voiceChannel,
-            isCollectionQuery ? songs.playlist : undefined,
+            isCollection ? songs.playlist : undefined,
+            placeNext,
         );
     }
 }

@@ -360,6 +360,31 @@
                 "slashStatusDescription": "Mevcut istek kanalını göster",
                 "slashChannelDescription": "İstek kanalı olarak ayarlanacak kanal",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Önceki şarkıya döner",
+                "playing": "{song} şarkısına dönüldü",
+                "restarted": "Önceki şarkı yok, bu yüzden {song} baştan başlatıldı.",
+                "noPrevious": "Dönülecek önceki bir şarkı yok."
+            },
+            "clear": {
+                "description": "Çalan şarkıyı koruyarak kuyruğu temizler",
+                "nothing": "Kuyrukta temizlenecek bekleyen şarkı yok."
+            },
+            "move": {
+                "description": "Bir şarkıyı kuyrukta başka bir konuma taşır",
+                "usage": "{prefix}move <nereden> <nereye>",
+                "slashFromDescription": "Taşınacak şarkının kuyruktaki konumu",
+                "slashToDescription": "Şarkının taşınacağı kuyruk konumu",
+                "moved": "{song}, {position}. konuma taşındı.",
+                "invalid": "Kuyruk listesinden iki farklı konum belirtin. Çalan şarkı taşınamaz ve hiçbir şarkı onun önüne geçirilemez."
+            },
+            "playNext": {
+                "description": "Çalan şarkıdan hemen sonra çalacak bir şarkı ekler",
+                "usage": "{prefix}playnext <sorgu | url | ekli dosya>"
+            },
+            "leave": {
+                "description": "Müzik çaları durdurur ve ses kanalından ayrılır"
             }
         }
     },
@@ -418,7 +443,12 @@
         "noChannel": "Şu anda ayarlanmış istek kanalı yok.",
         "currentChannel": "Mevcut istek kanalı: {channel}",
         "skipInProgress": "Lütfen bekleyin, bir atlama işlemi devam ediyor.",
-        "noPermission": "Bu işlemi gerçekleştirme izniniz yok. Sadece DJ rolü, sunucu yöneticileri veya şarkıyı isteyen kişi bunu yapabilir."
+        "noPermission": "Bu işlemi gerçekleştirme izniniz yok. Sadece DJ rolü, sunucu yöneticileri veya şarkıyı isteyen kişi bunu yapabilir.",
+        "ends": "{time} bitiyor",
+        "upNext": "Sıradaki",
+        "jumpPlaceholder": "Kuyruktaki bir şarkıya atla",
+        "addModalTitle": "Kuyruğa ekle",
+        "addModalLabel": "Şarkı adı veya URL"
     },
     "reusable": {
         "invalidUsage": "Geçersiz kullanım, lütfen daha fazla bilgi için {prefix} {name} kullanın.",

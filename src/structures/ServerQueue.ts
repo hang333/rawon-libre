@@ -7,7 +7,7 @@ import {
     createAudioPlayer,
     type VoiceConnection,
 } from "@discordjs/voice";
-import { MessageFlags, type Snowflake, type TextChannel } from "discord.js";
+import { type Message, MessageFlags, type Snowflake, type TextChannel } from "discord.js";
 import { type LoopMode, type QueueSong, type SavedQueueSong, type Song } from "../typings/index.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { type filterArgs } from "../utils/functions/ffmpegArgs.js";
@@ -15,6 +15,7 @@ import { formatBoldPrefixedCommand } from "../utils/functions/formatCodeSpan.js"
 import { formatMarkdownLink } from "../utils/functions/formatMarkdownLink.js";
 import { getEffectivePrefix } from "../utils/functions/getEffectivePrefix.js";
 import { i18n__mf } from "../utils/functions/i18n.js";
+import { buildPlayerPanel } from "../utils/functions/playerPanel.js";
 import { checkQuery, play, searchTrack } from "../utils/handlers/GeneralUtil.js";
 import { SongManager } from "../utils/structures/SongManager.js";
 import { BOT_SETTINGS_DEFAULTS } from "../utils/structures/SQLiteDataManager.js";
@@ -36,6 +37,25 @@ const nonEnum = { enumerable: false };
  * cycling while still leaving something to choose from.
  */
 const RECENTLY_PLAYED_LIMIT = 30;
+
+/** How many finished tracks `previous` can step back through. */
+const HISTORY_LIMIT = 50;
+
+/** Discord's code for a message that no longer exists. */
+const UNKNOWN_MESSAGE = 10_008;
+
+export type SeekResult =
+    | { ok: true; position: number }
+    | {
+          ok: false;
+          reason: "buffering" | "exceeds" | "live" | "notCached" | "notPlaying" | "soundcloud";
+      };
+
+export type StepBackResult =
+    | { kind: "busy" }
+    | { kind: "none" }
+    | { kind: "previous"; song: QueueSong }
+    | { kind: "restart"; song: QueueSong };
 
 export class ServerQueue {
     public readonly player: AudioPlayer = createAudioPlayer();
@@ -64,6 +84,9 @@ export class ServerQueue {
     private _autoplayPrefetchPromise: Promise<void> | null = null;
     private _autoplayPrefetchForKey: Snowflake | null = null;
     private _recentlyPlayed: string[] = [];
+    private _history: QueueSong[] = [];
+    private _panel: Message | null = null;
+    private _panelSongKey: Snowflake | null = null;
 
     public constructor(public readonly textChannel: TextChannel) {
         Object.defineProperties(this, {
@@ -80,6 +103,9 @@ export class ServerQueue {
             _autoplayPrefetchPromise: nonEnum,
             _autoplayPrefetchForKey: nonEnum,
             _recentlyPlayed: nonEnum,
+            _history: nonEnum,
+            _panel: nonEnum,
+            _panelSongKey: nonEnum,
         });
 
         this.songs = new SongManager(this.client, this.textChannel.guild);
@@ -89,6 +115,20 @@ export class ServerQueue {
         this.player
             .on("stateChange", async (oldState, newState) => {
                 const __mf = i18n__mf(this.client, this.textChannel.guild);
+                // Pausing and resuming change what a player panel shows, whichever
+                // command, button or voice event caused them.
+                const pausedStates: AudioPlayerStatus[] = [
+                    AudioPlayerStatus.Paused,
+                    AudioPlayerStatus.AutoPaused,
+                ];
+                if (
+                    oldState.status !== newState.status &&
+                    (pausedStates.includes(oldState.status) ||
+                        pausedStates.includes(newState.status))
+                ) {
+                    this.notifyChanged();
+                }
+
                 if (
                     newState.status === AudioPlayerStatus.Playing &&
                     oldState.status !== AudioPlayerStatus.Paused
@@ -109,7 +149,7 @@ export class ServerQueue {
                             `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${newSong.title}" on ${this.textChannel.guild.name} has started.`,
                         );
                     } else {
-                        this.sendStartPlayingMsg(newSong);
+                        this.showNowPlayingPanel(currentSong);
                     }
 
                     void this.client.requestChannelManager.updatePlayerMessage(
@@ -159,8 +199,10 @@ export class ServerQueue {
                         );
                     }
                     this.skipVoters = [];
-                    if (this.loopMode === "OFF") {
-                        this.songs.delete(song.key);
+                    // A track somebody removed is already gone from the queue by
+                    // now, and is not one `previous` should bring back.
+                    if (this.loopMode === "OFF" && this.songs.delete(song.key)) {
+                        this.rememberFinished(song);
                     }
 
                     let nextS: string | undefined;
@@ -216,7 +258,9 @@ export class ServerQueue {
                         this.textChannel.guild,
                         this.textChannel.id,
                     );
-                    if (!isRequestChannel) {
+                    // A player panel stays where it is between tracks and is redrawn
+                    // for the next one; only without a panel is there a notice to post.
+                    if (!isRequestChannel && this._panel === null) {
                         await this.textChannel
                             .send({
                                 flags: MessageFlags.SuppressNotifications,
@@ -589,6 +633,7 @@ export class ServerQueue {
         this.filters[filter] = state;
 
         void this.saveState();
+        this.notifyChanged();
 
         if (before !== state && this.player.state.status === AudioPlayerStatus.Playing) {
             const resource = (this.player.state as AudioPlayerPlayingState).resource;
@@ -631,6 +676,7 @@ export class ServerQueue {
     public setLoopMode(mode: LoopMode): void {
         this.loopMode = mode;
         void this.saveState();
+        this.notifyChanged();
     }
 
     public setShuffle(value: boolean): void {
@@ -641,6 +687,7 @@ export class ServerQueue {
             this._shuffleUpcomingKeys = [];
         }
         void this.saveState();
+        this.notifyChanged();
     }
 
     public setAutoPlay(value: boolean): void {
@@ -653,6 +700,7 @@ export class ServerQueue {
             this.preCacheNextSong(currentSong);
         }
         void this.saveState();
+        this.notifyChanged();
     }
 
     public setAutoplay(value: boolean): void {
@@ -696,6 +744,7 @@ export class ServerQueue {
         }
         this._suppressPlayerErrors = true;
         this.stop();
+        void this.setPanel(null);
 
         try {
             this.connection?.disconnect();
@@ -800,6 +849,7 @@ export class ServerQueue {
         ).resource;
         resource?.volume?.setVolumeLogarithmic(this._volume / 100);
         void this.saveState();
+        this.notifyChanged();
     }
 
     public get skipVoters(): Snowflake[] {
@@ -888,33 +938,345 @@ export class ServerQueue {
         return this.client.data.botSettings.enableAudioCache;
     }
 
-    private sendStartPlayingMsg(newSong: QueueSong["song"]): void {
-        const __mf = i18n__mf(this.client, this.textChannel.guild);
+    /**
+     * Announce a track in the queue's text channel with a player panel: what is
+     * playing, plus the buttons to control it.
+     *
+     * The panel is redrawn where it stands when the same track restarts (a seek
+     * or a filter change) or when nothing has been posted under it, so that the
+     * buttons do not jump away from whoever is using them. Once the conversation
+     * has moved on, a fresh panel goes to the bottom and the old one is removed.
+     */
+    private showNowPlayingPanel(current: QueueSong): void {
         this.client.logger.info(
-            `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${newSong.title}" on ${
+            `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${current.song.title}" on ${
                 this.textChannel.guild.name
             } has started.`,
         );
-        (async () => {
-            const thumb =
-                typeof newSong.thumbnail === "string" && /^https?:\/\//i.test(newSong.thumbnail)
-                    ? newSong.thumbnail
-                    : null;
-            await this.textChannel
-                .send({
+
+        const panel = this._panel;
+        if (
+            panel !== null &&
+            (this._panelSongKey === current.key || panel.channel.lastMessageId === panel.id)
+        ) {
+            // The caller asks every panel to redraw right after this.
+            this._panelSongKey = current.key;
+            return;
+        }
+
+        void (async () => {
+            try {
+                const message = await this.textChannel.send({
                     flags: MessageFlags.SuppressNotifications,
-                    embeds: [
-                        createEmbed(
-                            "info",
-                            `▶️ **|** ${__mf("utils.generalHandler.startPlaying", {
-                                song: `**${formatMarkdownLink(newSong.title, newSong.url)}**`,
-                            })}`,
-                        ).setThumbnail(thumb),
-                    ],
-                })
-                .then((ms) => (this.lastMusicMsg = ms.id))
-                .catch((error: unknown) => this.client.logger.error("PLAY_ERR:", error));
+                    ...buildPlayerPanel(this.client, this.textChannel.guild, "compact"),
+                });
+
+                // The track may have ended, or the queue been destroyed, while the
+                // message was on its way.
+                if (this.currentSong?.key !== current.key) {
+                    await message.delete().catch(() => null);
+                    return;
+                }
+
+                // Clears the "stopped playing" notice of a track that had no panel.
+                this.lastMusicMsg = null;
+                await this.setPanel(message, current.key);
+            } catch (error) {
+                this.client.logger.error("PLAY_ERR:", error);
+            }
         })();
+    }
+
+    /** The message that currently serves as this queue's player panel, if any. */
+    public get panel(): Message | null {
+        return this._panel;
+    }
+
+    /**
+     * Make `message` this queue's player panel, removing the one it replaces.
+     * Only this bot's own messages are accepted: the panel is edited and
+     * eventually deleted, which must never happen to somebody else's message.
+     */
+    public async setPanel(
+        message: Message | null,
+        songKey: Snowflake | null = null,
+    ): Promise<void> {
+        if (message !== null && message.author.id !== this.client.user?.id) {
+            return;
+        }
+
+        const previous = this._panel;
+        this._panel = message;
+        this._panelSongKey = message === null ? null : songKey;
+
+        if (previous !== null && previous.id !== message?.id) {
+            await previous.delete().catch(() => null);
+        }
+    }
+
+    /** Redraw the player panel to match the queue. Does nothing without one. */
+    public async refreshPanel(): Promise<void> {
+        const panel = this._panel;
+        const current = this.currentSong;
+        if (panel === null || current === undefined) {
+            return;
+        }
+
+        const guild = this.textChannel.guild;
+        // A channel that became the request channel has its own player message,
+        // maintained by the request channel manager.
+        if (this.client.requestChannelManager.isRequestChannel(guild, panel.channelId)) {
+            this._panel = null;
+            this._panelSongKey = null;
+            return;
+        }
+
+        try {
+            await panel.edit(buildPlayerPanel(this.client, guild, "compact"));
+        } catch (error) {
+            if ((error as { code?: number }).code !== UNKNOWN_MESSAGE) {
+                this.client.logger.debug(
+                    `Failed to update player panel: ${(error as Error).message}`,
+                );
+                return;
+            }
+
+            // Somebody deleted the panel. Post a new one rather than leave the
+            // track without controls.
+            if (this._panel?.id === panel.id) {
+                this._panel = null;
+                this._panelSongKey = null;
+                if (this.currentSong?.key === current.key) {
+                    this.showNowPlayingPanel(current);
+                }
+            }
+        }
+    }
+
+    /**
+     * Ask every player panel of this guild to redraw. Cheap to call: the request
+     * channel manager debounces it. A queue that has not joined a voice channel
+     * yet is still being set up and has nothing on screen to update.
+     */
+    public notifyChanged(): void {
+        if (this.connection === null) {
+            return;
+        }
+
+        void this.client.requestChannelManager.updatePlayerMessage(this.textChannel.guild);
+    }
+
+    /** The track the player currently holds, playing or paused. */
+    public get currentSong(): QueueSong | undefined {
+        const resource = (this.player.state as { resource?: AudioResource }).resource;
+        return resource?.metadata as QueueSong | undefined;
+    }
+
+    /** How far into the current track playback is, in seconds. */
+    public get position(): number {
+        const resource = (this.player.state as { resource?: AudioResource }).resource;
+        return Math.floor((resource?.playbackDuration ?? 0) / 1_000) + this.seekOffset;
+    }
+
+    /**
+     * The queue in the order and numbering the `queue` command lists it: all of
+     * it under queue repeat, otherwise the current track and what comes after.
+     */
+    public listed(): QueueSong[] {
+        const current = this.currentSong;
+        const sorted = [...this.songs.sortByIndex().values()];
+
+        return this.loopMode === "QUEUE" || current === undefined
+            ? sorted
+            : sorted.filter((entry) => entry.index >= current.index);
+    }
+
+    /** What follows the current track, in the order it would be reached. */
+    public upcoming(): QueueSong[] {
+        const current = this.currentSong;
+        const list = this.listed();
+        const at = current === undefined ? -1 : list.findIndex((x) => x.key === current.key);
+
+        return at === -1 ? list : [...list.slice(at + 1), ...list.slice(0, at)];
+    }
+
+    /** The track that plays next if nothing changes, auto-play's pick included. */
+    public peekNext(): Song | undefined {
+        const current = this.currentSong;
+        if (current === undefined) {
+            return undefined;
+        }
+
+        const nextKey = this.peekNextKey(current);
+        if (nextKey !== undefined) {
+            return nextKey === current.key ? undefined : this.songs.get(nextKey)?.song;
+        }
+
+        return this.autoPlay && this._prefetchedAutoplaySong?.fromSongKey === current.key
+            ? this._prefetchedAutoplaySong.song
+            : undefined;
+    }
+
+    /** Keep a finished track so that `previous` can return to it. */
+    private rememberFinished(song: QueueSong): void {
+        this._history.push(song);
+        while (this._history.length > HISTORY_LIMIT) {
+            this._history.shift();
+        }
+    }
+
+    /**
+     * Go back one track: to an earlier one still in the queue, else to the last
+     * one that finished, else (under queue repeat) around to the end. When there
+     * is nothing to go back to, the current track starts over, which is what a
+     * "previous" button does on every other player.
+     */
+    public stepBack(): StepBackResult {
+        const current = this.currentSong;
+        const sorted = this.songs.sortByIndex();
+
+        let target =
+            current === undefined
+                ? undefined
+                : sorted.filter((entry) => entry.index < current.index).last();
+
+        if (target === undefined && this._history.length === 0 && current === undefined) {
+            return { kind: "none" };
+        }
+
+        if (!this.startSkip()) {
+            return { kind: "busy" };
+        }
+
+        if (target === undefined) {
+            const finished = this._history.pop();
+            if (finished !== undefined) {
+                this.songs.restoreSong(
+                    finished.key,
+                    finished.index,
+                    finished.song,
+                    finished.requester,
+                );
+                target = finished;
+            }
+        }
+
+        if (target === undefined && current !== undefined && this.loopMode === "QUEUE") {
+            target = sorted.filter((entry) => entry.key !== current.key).last();
+        }
+
+        const guild = this.textChannel.guild;
+        if (target !== undefined) {
+            void play(guild, target.key);
+            return { kind: "previous", song: target };
+        }
+
+        // Only reachable with a current track: the empty case returned above.
+        const restarting = current as QueueSong;
+        this.playing = false;
+        void play(guild, restarting.key, true, 0);
+        return { kind: "restart", song: restarting };
+    }
+
+    /** Why the current track cannot be sought at all, or null when it can. */
+    public seekability(): "live" | "notPlaying" | "soundcloud" | null {
+        const current = this.currentSong;
+        if (this.player.state.status !== AudioPlayerStatus.Playing || current === undefined) {
+            return "notPlaying";
+        }
+        if (current.song.isLive === true) {
+            return "live";
+        }
+
+        return checkQuery(current.song.url).sourceType === "soundcloud" ? "soundcloud" : null;
+    }
+
+    /**
+     * Move playback of the current track to `seconds`. Seeking re-opens the
+     * audio at an offset, which needs the track to be fully in the cache.
+     */
+    public seek(seconds: number): SeekResult {
+        const current = this.currentSong;
+        const unseekable = this.seekability();
+        if (unseekable !== null || current === undefined) {
+            return { ok: false, reason: unseekable ?? "notPlaying" };
+        }
+        if (seconds >= current.song.duration) {
+            return { ok: false, reason: "exceeds" };
+        }
+
+        if (this.resolvedEnableAudioCache && seconds > 0) {
+            const isCached = this.client.audioCache.isCached(current.song.url);
+            const isInProgress = this.client.audioCache.isInProgress(current.song.url);
+
+            if (!isCached) {
+                return { ok: false, reason: isInProgress ? "buffering" : "notCached" };
+            }
+        }
+
+        this.playing = false;
+        void play(this.textChannel.guild, current.key, true, seconds);
+        return { ok: true, position: seconds };
+    }
+
+    /** Remove everything but the current track. Returns how many tracks went. */
+    public clearUpcoming(): number {
+        const current = this.currentSong;
+        const doomed = this.songs.filter((entry) => entry.key !== current?.key);
+
+        this._shuffleUpcomingKeys = [];
+        return this.songs.deleteMany([...doomed.keys()]);
+    }
+
+    /**
+     * Move the track at position `from` to position `to`, both as the `queue`
+     * command numbers them. The current track stays put, and outside queue
+     * repeat nothing can be placed ahead of it. Returns the moved track, or null
+     * when the positions do not describe a possible move.
+     */
+    public move(from: number, to: number): QueueSong | null {
+        const current = this.currentSong;
+        const list = this.listed();
+        const song = list[from - 1] as QueueSong | undefined;
+
+        if (
+            song === undefined ||
+            song.key === current?.key ||
+            from === to ||
+            !Number.isInteger(to) ||
+            to < 1 ||
+            to > list.length
+        ) {
+            return null;
+        }
+        if (this.loopMode !== "QUEUE" && current !== undefined && to === 1) {
+            return null;
+        }
+
+        const order = list.filter((entry) => entry.key !== song.key);
+        order.splice(to - 1, 0, song);
+        this.songs.reposition(order.map((entry) => entry.key));
+
+        return song;
+    }
+
+    /** Make the given tracks the next ones to play, in the order given. */
+    public queueNext(keys: Snowflake[]): void {
+        const current = this.currentSong;
+        const moving = new Set(keys);
+        const rest = [...this.songs.sortByIndex().values()].filter(
+            (entry) =>
+                !moving.has(entry.key) && (current === undefined || entry.index > current.index),
+        );
+
+        this.songs.reposition([...keys, ...rest.map((entry) => entry.key)]);
+
+        if (this.shuffle) {
+            this._shuffleUpcomingKeys = [
+                ...keys,
+                ...this._shuffleUpcomingKeys.filter((key) => !moving.has(key)),
+            ];
+        }
     }
 
     private preCacheNextSong(currentSong: QueueSong): void {

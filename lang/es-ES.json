@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Mostrar el canal de solicitudes actual",
                 "slashChannelDescription": "El canal a establecer como canal de solicitudes",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Vuelve a la canción anterior",
+                "playing": "Se ha vuelto a {song}",
+                "restarted": "No hay ninguna canción anterior; {song} empieza de nuevo.",
+                "noPrevious": "No hay ninguna canción anterior a la que volver."
+            },
+            "clear": {
+                "description": "Vacía la cola y mantiene la canción actual",
+                "nothing": "No hay nada en espera en la cola que vaciar."
+            },
+            "move": {
+                "description": "Mueve una canción a otra posición de la cola",
+                "usage": "{prefix}move <desde> <hasta>",
+                "slashFromDescription": "Posición en la cola de la canción que se mueve",
+                "slashToDescription": "Posición de la cola a la que se mueve",
+                "moved": "Se movió {song} a la posición {position}.",
+                "invalid": "Indica dos posiciones distintas de la lista de la cola. La canción que está sonando no se puede mover, y nada puede ponerse delante de ella."
+            },
+            "playNext": {
+                "description": "Añade una canción para que suene justo después de la actual",
+                "usage": "{prefix}playnext <consulta / url / archivo adjunto>"
+            },
+            "leave": {
+                "description": "Para el reproductor de música y sale del canal de voz"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "No hay canal de solicitudes establecido actualmente.",
         "currentChannel": "Canal de solicitudes actual: {channel}",
         "skipInProgress": "Por favor espera, una operación de salto está en progreso.",
-        "noPermission": "No tienes permiso para realizar esta acción. Solo el rol DJ, administradores del servidor o quien solicitó la canción pueden hacerlo."
+        "noPermission": "No tienes permiso para realizar esta acción. Solo el rol DJ, administradores del servidor o quien solicitó la canción pueden hacerlo.",
+        "ends": "Termina {time}",
+        "upNext": "A continuación",
+        "jumpPlaceholder": "Saltar a una canción de la cola",
+        "addModalTitle": "Añadir a la cola",
+        "addModalLabel": "Nombre de la canción o URL"
     },
     "reusable": {
         "invalidUsage": "Uso inválido, por favor usa {prefix} {name} para más información.",

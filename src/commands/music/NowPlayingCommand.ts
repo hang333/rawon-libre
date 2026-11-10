@@ -1,31 +1,17 @@
 /** biome-ignore-all lint/style/useNamingConvention: disable naming convention rule for this file */
-import { clearInterval, setInterval } from "node:timers";
-import { type AudioPlayerState, type AudioResource } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import {
-    ActionRowBuilder,
-    type APIMessageTopLevelComponent,
-    ButtonBuilder,
-    ButtonStyle,
-    ComponentType,
-    type EmbedBuilder,
-    type Interaction,
+    BaseInteraction,
+    type CommandInteraction,
     PermissionFlagsBits,
     type SlashCommandBuilder,
 } from "discord.js";
 import i18n from "../../config/index.js";
-import { CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
-import { type QueueSong } from "../../typings/index.js";
 import { haveQueue } from "../../utils/decorators/MusicUtil.js";
-import { assetUrl } from "../../utils/functions/assets.js";
-import { createEmbed } from "../../utils/functions/createEmbed.js";
-import { createProgressBar } from "../../utils/functions/createProgressBar.js";
-import { formatMarkdownLink } from "../../utils/functions/formatMarkdownLink.js";
-import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
-import { normalizeTime } from "../../utils/functions/normalizeTime.js";
+import { buildPlayerEmbed, buildPlayerPanel } from "../../utils/functions/playerPanel.js";
 
 @ApplyOptions<Command.Options>({
     name: "nowplaying",
@@ -56,179 +42,36 @@ export class NowPlayingCommand extends ContextCommand {
     @haveQueue
     public async contextRun(ctx: CommandContext): Promise<void> {
         const client = this.getClient(ctx);
-        const __ = i18n__(client, ctx.guild);
-        const __mf = i18n__mf(client, ctx.guild);
-        const getEmbed = (): EmbedBuilder => {
-            try {
-                const res = (
-                    ctx.guild?.queue?.player.state as
-                        | (AudioPlayerState & {
-                              resource: AudioResource | undefined;
-                          })
-                        | undefined
-                )?.resource;
-                const queueSong = res?.metadata as QueueSong | undefined;
-                const song = queueSong?.song;
-                const seekOffset = ctx.guild?.queue?.seekOffset ?? 0;
-
-                const embed = createEmbed(
-                    "info",
-                    `${ctx.guild?.queue?.playing === true ? "▶️" : "⏸️"} **|** `,
-                );
-                let thumb: string | undefined = song?.thumbnail;
-                if (typeof thumb !== "string" || !/^https?:\/\//i.test(thumb)) {
-                    thumb = assetUrl(client, "icon");
-                }
-                embed.setThumbnail(thumb ?? null);
-
-                const curr = Math.trunc((res?.playbackDuration ?? 0) / 1_000) + seekOffset;
-                let progressLine: string;
-                if (song?.isLive === true) {
-                    progressLine = `🔴 **\`${__("commands.music.nowplaying.live")}\`**`;
-                } else if (song) {
-                    const total = Number.isFinite(song.duration) ? song.duration : 0;
-                    if (total <= 0) {
-                        progressLine = `${normalizeTime(curr)} • ${__("commands.music.nowplaying.unknownDuration")}`;
-                    } else {
-                        progressLine = `${normalizeTime(curr)} ${createProgressBar(curr, total)} ${normalizeTime(total)}`;
-                    }
-                } else {
-                    progressLine = "";
-                }
-
-                if (song) {
-                    const requesterLine = queueSong?.requester
-                        ? `\n\n${__("commands.music.nowplaying.requestedBy")}: ${queueSong.requester.toString()}`
-                        : "";
-                    embed.data.description += `**${formatMarkdownLink(song.title, song.url)}**\n${progressLine}${requesterLine}`;
-                } else {
-                    embed.data.description += __("commands.music.nowplaying.emptyQueue");
-                }
-
-                return embed;
-            } catch (error) {
-                this.container.logger.error(
-                    "NOWPLAY_ERR:",
-                    error instanceof Error ? (error.stack ?? error) : error,
-                );
-                const msg = __mf("commands.music.nowplaying.error", {
-                    message: (error as Error)?.message ?? "Unknown error",
-                });
-                return createEmbed("error", msg, true);
-            }
-        };
-
-        const hasRequestChannel = ctx.guild
-            ? (ctx.guild.client as Rawon).requestChannelManager.hasRequestChannel(ctx.guild)
-            : false;
-
-        if (hasRequestChannel) {
-            await ctx.reply({ embeds: [getEmbed()] });
+        const guild = ctx.guild;
+        const queue = guild?.queue;
+        if (!guild || !queue) {
             return;
         }
 
-        const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId("TOGGLE_STATE_BUTTON")
-                .setLabel(__("commands.music.nowplaying.pauseResumeButton"))
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji("⏯️"),
-            new ButtonBuilder()
-                .setCustomId("SKIP_BUTTON")
-                .setLabel(__("commands.music.nowplaying.skipButton"))
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji("⏭️"),
-            new ButtonBuilder()
-                .setCustomId("STOP_BUTTON")
-                .setLabel(__("commands.music.nowplaying.stopButton"))
-                .setStyle(ButtonStyle.Danger)
-                .setEmoji("⏹️"),
-            new ButtonBuilder()
-                .setCustomId("SHOW_QUEUE_BUTTON")
-                .setLabel(__("commands.music.nowplaying.showQueueButton"))
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji("#️⃣"),
-        );
-        const msg = await ctx.reply({
-            embeds: [getEmbed()],
-            components: [buttons.toJSON() as APIMessageTopLevelComponent],
-        });
+        // A server with a request channel already has its player there, with the
+        // controls; here the status alone is enough.
+        if (client.requestChannelManager.hasRequestChannel(guild)) {
+            await ctx.reply({ embeds: [buildPlayerEmbed(client, guild, "compact")] });
+            return;
+        }
 
-        const collector = msg.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            filter: (i) => i.isButton() && i.user.id === ctx.author.id,
-            idle: 30_000,
-        });
+        // Everywhere else this brings the player panel to wherever it was asked
+        // for: the reply becomes the queue's panel, and the old one is removed.
+        const reply = await ctx.reply(buildPlayerPanel(client, guild, "compact"));
+        const current = queue.currentSong;
+        if (current === undefined) {
+            return;
+        }
 
-        const updateInterval = setInterval(async () => {
-            try {
-                const res = (
-                    ctx.guild?.queue?.player.state as
-                        | (AudioPlayerState & {
-                              resource: AudioResource | undefined;
-                          })
-                        | undefined
-                )?.resource;
-                const queueSong = res?.metadata as QueueSong | undefined;
-                if (!queueSong) {
-                    return;
-                }
-
-                await msg.edit({ embeds: [getEmbed()] }).catch(() => null);
-            } catch {}
-        }, 5_000);
-
-        collector
-            .on("collect", async (i) => {
-                const newCtx = new LocalCommandContext(i as Interaction, []);
-                let cmdName = "";
-
-                switch (i.customId) {
-                    case "TOGGLE_STATE_BUTTON": {
-                        cmdName = ctx.guild?.queue?.playing === true ? "pause" : "resume";
-                        break;
-                    }
-
-                    case "SKIP_BUTTON": {
-                        cmdName = "skip";
-                        break;
-                    }
-
-                    case "SHOW_QUEUE_BUTTON": {
-                        cmdName = "queue";
-                        break;
-                    }
-
-                    case "STOP_BUTTON": {
-                        cmdName = "stop";
-                        break;
-                    }
-
-                    default:
-                        break;
-                }
-                const cmd = client.commands.get(cmdName) as
-                    | { contextRun?: (ctx: CommandContext) => Promise<unknown> }
-                    | undefined;
-                await cmd?.contextRun?.(newCtx as CommandContext & LocalCommandContext);
-
-                const embed = getEmbed();
-
-                await msg.edit({ embeds: [embed] }).catch(() => null);
-            })
-            .on("end", async () => {
-                clearInterval(updateInterval);
-
-                const embed = getEmbed().setFooter({
-                    text: `• ${__("commands.music.nowplaying.disableButton")}`,
-                });
-
-                await msg
-                    .edit({
-                        embeds: [embed],
-                        components: [],
-                    })
-                    .catch(() => null);
-            });
+        // For a slash command the message is fetched through the interaction;
+        // guessing at "the latest message in the channel" could pick up someone
+        // else's, and a panel is a message that gets edited and deleted.
+        const message =
+            ctx.context instanceof BaseInteraction
+                ? await (ctx.context as CommandInteraction).fetchReply().catch(() => null)
+                : reply;
+        if (message !== null) {
+            await queue.setPanel(message, current.key);
+        }
     }
 }

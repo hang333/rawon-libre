@@ -97,6 +97,11 @@ export type SearchProvider = "youtube" | "youtube-music";
 export const searchProvider: SearchProvider =
     process.env.SEARCH_PROVIDER?.trim().toLowerCase() === "youtube" ? "youtube" : "youtube-music";
 
+// Whether a search that finds nothing on YouTube, or a Spotify track with no
+// match there, is looked for on Bilibili before it is given up. Only "no" turns
+// it off.
+export const bilibiliFallback = process.env.BILIBILI_FALLBACK?.trim().toLowerCase() !== "no";
+
 const baseUrlFromEnv = (value: string | undefined): string =>
     (value ?? "").trim().replace(/\/+$/u, "");
 

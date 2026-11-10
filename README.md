@@ -39,11 +39,40 @@ stay AGPL-3.0.
 ## Features
 - Production-ready, no coding required
 - Request channel feature for seamless music experience
-- Support for YouTube, Spotify, SoundCloud, Bilibili, and direct files
+- A player panel with every track: buttons, a jump-to-track menu and an "add to queue" dialog, so
+  playback can be run without typing a command
+- Support for YouTube, Spotify, SoundCloud, Bilibili (multi-part videos included), and direct files
+- Falls back to Bilibili when a search, or a track from a Spotify link, has no match on YouTube
 - Play audio or video files uploaded straight to Discord, in the request channel or with `play`
 - Run multiple bot instances for different voice channels
 - Smart audio pre-caching for smoother playback
 - Built-in Google login via Puppeteer for cookie management
+
+## Controlling playback
+Each command is available as a slash command and with the prefix, whichever of the two is enabled.
+
+| Command | What it does |
+| --- | --- |
+| `play`, `playnext`, `search` | Queue a track: at the end, or right after the one that is playing |
+| `pause`, `resume`, `skip`, `previous`, `seek` | Move around in what is playing |
+| `queue`, `skipto`, `move`, `remove`, `clear` | Look at the queue and rearrange it |
+| `repeat`, `shuffle`, `autoplay`, `volume`, `filter` | Change how it plays |
+| `stop`, `leave` | Empty the queue and leave the voice channel |
+| `nowplaying` | Bring the player panel to the channel you are in |
+
+The **player panel** carries the same controls as buttons. The bot posts it when a track starts, and
+a request channel shows a permanent one.
+
+- ⏮️ ⏯️ ⏭️ ⏹️ 📋 — previous, pause or resume, skip, stop, show the queue
+- 🔁 🔀 ♾️ 🔉 🔊 — repeat mode, shuffle, auto-play, volume down and up
+- ⏪ ⏩ 🗑️ 📜 ➕ — back and forward ten seconds, remove the current track, lyrics, add a track
+- A menu under the buttons jumps straight to any of the next 25 tracks
+
+The panel stays in place while nothing is posted under it and is re-posted at the bottom of the
+channel once the conversation has moved on. Its buttons work for anyone in the bot's voice channel
+and keep working after a restart. Skipping, removing and stopping follow the same rules as the
+commands: the track's requester, a DJ or a server manager decides alone, and anyone else casts a
+vote to skip.
 
 ## Installation
 

@@ -54,6 +54,19 @@ const MUSIC_COMMANDS = [
     "np",
     "queue",
     "q",
+    "playnext",
+    "pn",
+    "playtop",
+    "pt",
+    "previous",
+    "prev",
+    "back",
+    "clear",
+    "clearqueue",
+    "cq",
+    "move",
+    "mv",
+    "leave",
 ];
 
 @ApplyOptions<ListenerOptions>({

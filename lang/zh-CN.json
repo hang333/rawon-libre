@@ -384,6 +384,31 @@
                 "noPermission": "你需要「管理服务器」权限才能修改常驻模式。",
                 "enabledText": "常驻模式已**开启**。频道空了仍会暂停播放，但会保留队列，有人回来时继续播放。",
                 "disabledText": "常驻模式已**关闭**。频道空置一段时间后，机器人将离开并清空队列。"
+            },
+            "previous": {
+                "description": "返回上一首",
+                "playing": "已返回 {song}",
+                "restarted": "没有更早的歌曲了，已从头播放 {song}。",
+                "noPrevious": "没有可以返回的上一首。"
+            },
+            "clear": {
+                "description": "清空队列，保留当前播放的歌曲",
+                "nothing": "队列中没有等待播放的歌曲可清空。"
+            },
+            "move": {
+                "description": "将歌曲移动到队列中的其他位置",
+                "usage": "{prefix}move <原位置> <新位置>",
+                "slashFromDescription": "要移动的歌曲在队列中的位置",
+                "slashToDescription": "要移动到的队列位置",
+                "moved": "已将 {song} 移动到第 {position} 位。",
+                "invalid": "请提供队列列表中两个不同的位置。正在播放的歌曲无法移动，也不能把歌曲排到它前面。"
+            },
+            "playNext": {
+                "description": "添加一首歌曲，在当前歌曲之后立即播放",
+                "usage": "{prefix}playnext <查询 | url | 附件>"
+            },
+            "leave": {
+                "description": "停止音乐播放器并离开语音频道"
             }
         }
     },
@@ -443,7 +468,12 @@
         "noChannel": "当前没有设置点歌频道。",
         "currentChannel": "当前点歌频道：{channel}",
         "skipInProgress": "请稍候，跳过操作正在进行中。",
-        "noPermission": "您没有权限执行此操作。只有DJ身份组、服务器管理员或点歌者可以执行此操作。"
+        "noPermission": "您没有权限执行此操作。只有DJ身份组、服务器管理员或点歌者可以执行此操作。",
+        "ends": "{time}结束",
+        "upNext": "下一首",
+        "jumpPlaceholder": "跳转到队列中的歌曲",
+        "addModalTitle": "添加到队列",
+        "addModalLabel": "歌曲名称或链接"
     },
     "reusable": {
         "invalidUsage": "无效的用法，请用 {prefix} {name}了解更多资讯。",

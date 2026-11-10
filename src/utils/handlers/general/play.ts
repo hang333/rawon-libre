@@ -53,6 +53,8 @@ export async function play(
     if (!song) {
         queue.lastMusicMsg = null;
         queue.lastVSUpdateMsg = null;
+        // Nothing is left to control once the queue has run out.
+        void queue.setPanel(null);
 
         const isRequestChannel = queue.client.requestChannelManager.isRequestChannel(
             guild,

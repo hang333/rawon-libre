@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Afficher le canal de requête actuel",
                 "slashChannelDescription": "Le canal à définir comme canal de requête",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Revenir au morceau précédent",
+                "playing": "Retour à {song}",
+                "restarted": "Aucun morceau précédent : {song} reprend depuis le début.",
+                "noPrevious": "Il n'y a aucun morceau précédent auquel revenir."
+            },
+            "clear": {
+                "description": "Vider la file d'attente en gardant le morceau en cours",
+                "nothing": "Il n'y a rien en attente à retirer de la file."
+            },
+            "move": {
+                "description": "Déplacer un morceau vers une autre position de la file d'attente",
+                "usage": "{prefix}move <de> <vers>",
+                "slashFromDescription": "Position dans la file du morceau à déplacer",
+                "slashToDescription": "Position de la file où le placer",
+                "moved": "{song} a été déplacé en position {position}.",
+                "invalid": "Indiquez deux positions différentes de la liste de la file d'attente. Le morceau en cours ne peut pas être déplacé, et rien ne peut passer devant lui."
+            },
+            "playNext": {
+                "description": "Ajouter un morceau à lire juste après celui en cours",
+                "usage": "{prefix}playnext <requête | url | fichier joint>"
+            },
+            "leave": {
+                "description": "Arrêter le lecteur de musique et quitter le salon vocal"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "Aucun salon de demandes n'est actuellement défini.",
         "currentChannel": "Salon de demandes actuel : {channel}",
         "skipInProgress": "Veuillez patienter, une opération de saut est en cours.",
-        "noPermission": "Vous n'avez pas la permission d'effectuer cette action. Seuls le rôle DJ, les gestionnaires du serveur ou le demandeur de la chanson peuvent le faire."
+        "noPermission": "Vous n'avez pas la permission d'effectuer cette action. Seuls le rôle DJ, les gestionnaires du serveur ou le demandeur de la chanson peuvent le faire.",
+        "ends": "Se termine {time}",
+        "upNext": "À suivre",
+        "jumpPlaceholder": "Aller à un morceau de la file d'attente",
+        "addModalTitle": "Ajouter à la file d'attente",
+        "addModalLabel": "Titre du morceau ou URL"
     },
     "reusable": {
         "invalidUsage": "Usage invalide, veuillez utiliser {prefix} {name} pour plus d'informations.",

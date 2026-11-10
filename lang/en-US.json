@@ -384,6 +384,31 @@
                 "noPermission": "You need the Manage Server permission to change always-on mode.",
                 "enabledText": "Always-on is now **on**. Playback still pauses when the channel empties, but the queue is kept and resumes when someone returns.",
                 "disabledText": "Always-on is now **off**. The bot will leave and clear the queue after the channel has been empty for a while."
+            },
+            "previous": {
+                "description": "Go back to the previous track",
+                "playing": "Went back to {song}",
+                "restarted": "There is no earlier track, so {song} was started over.",
+                "noPrevious": "There is no previous track to go back to."
+            },
+            "clear": {
+                "description": "Clear the queue, keeping the current track",
+                "nothing": "There is nothing waiting in the queue to clear."
+            },
+            "move": {
+                "description": "Move a track to another position in the queue",
+                "usage": "{prefix}move <from> <to>",
+                "slashFromDescription": "Queue position of the track to move",
+                "slashToDescription": "Queue position to move it to",
+                "moved": "Moved {song} to position {position}.",
+                "invalid": "Give two different positions from the queue list. The track that is playing can't be moved, and nothing can go ahead of it."
+            },
+            "playNext": {
+                "description": "Add a track to play right after the current one",
+                "usage": "{prefix}playnext <query | url | attached file>"
+            },
+            "leave": {
+                "description": "Stop the music player and leave the voice channel"
             }
         }
     },
@@ -443,7 +468,12 @@
         "noChannel": "No request channel is currently set.",
         "currentChannel": "Current request channel: {channel}",
         "skipInProgress": "Please wait, a skip operation is already in progress.",
-        "noPermission": "You don't have permission to perform this action. Only DJ role, server managers, or the song requester can do this."
+        "noPermission": "You don't have permission to perform this action. Only DJ role, server managers, or the song requester can do this.",
+        "ends": "Ends {time}",
+        "upNext": "Up next",
+        "jumpPlaceholder": "Jump to a track in the queue",
+        "addModalTitle": "Add to queue",
+        "addModalLabel": "Song name or URL"
     },
     "reusable": {
         "invalidUsage": "Invalid usage. Please use {prefix} {name} for more information.",

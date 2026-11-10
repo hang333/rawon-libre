@@ -361,6 +361,31 @@
                 "slashStatusDescription": "현재 요청 채널 보기",
                 "slashChannelDescription": "요청 채널로 설정할 채널",
                 "usage": "{prefix}requestchannel <set | remove | status> [채널]"
+            },
+            "previous": {
+                "description": "이전 노래로 돌아가기",
+                "playing": "{song}(으)로 돌아갔어요",
+                "restarted": "이전 노래가 없어서 {song}을(를) 처음부터 다시 재생해요.",
+                "noPrevious": "돌아갈 이전 노래가 없어요."
+            },
+            "clear": {
+                "description": "현재 노래만 남기고 대기열 비우기",
+                "nothing": "대기열에 비울 노래가 없어요."
+            },
+            "move": {
+                "description": "노래를 대기열의 다른 위치로 옮기기",
+                "usage": "{prefix}move <원래 위치> <새 위치>",
+                "slashFromDescription": "옮길 노래의 대기열 위치",
+                "slashToDescription": "옮겨 놓을 대기열 위치",
+                "moved": "{song}을(를) {position}번 위치로 옮겼어요.",
+                "invalid": "대기열 목록에 있는 서로 다른 위치 두 개를 입력해 주세요. 재생 중인 노래는 옮길 수 없고, 그 앞에 다른 노래를 둘 수도 없어요."
+            },
+            "playNext": {
+                "description": "현재 노래 바로 다음에 재생할 노래 추가",
+                "usage": "{prefix}playnext <검색어 | URL | 첨부 파일>"
+            },
+            "leave": {
+                "description": "음악 플레이어를 정지하고 음성 채널에서 나가기"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "현재 설정된 요청 채널이 없어요.",
         "currentChannel": "현재 요청 채널: {channel}",
         "skipInProgress": "잠시만요, 건너뛰기 작업이 이미 진행 중이에요.",
-        "noPermission": "이 작업을 수행할 권한이 없어요. DJ 역할, 서버 관리자 또는 노래 요청자만 할 수 있어요."
+        "noPermission": "이 작업을 수행할 권한이 없어요. DJ 역할, 서버 관리자 또는 노래 요청자만 할 수 있어요.",
+        "ends": "{time} 종료",
+        "upNext": "다음 곡",
+        "jumpPlaceholder": "대기열의 노래로 건너뛰기",
+        "addModalTitle": "대기열에 추가",
+        "addModalLabel": "노래 제목 또는 URL"
     },
     "reusable": {
         "invalidUsage": "잘못된 사용법이에요. {prefix} {name}으로 자세한 정보를 확인하세요.",

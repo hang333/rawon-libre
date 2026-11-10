@@ -361,6 +361,31 @@
                 "slashStatusDescription": "Mostrar o canal de solicitação atual",
                 "slashChannelDescription": "O canal a ser definido como canal de solicitação",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "previous": {
+                "description": "Volta para a música anterior",
+                "playing": "Voltei para {song}",
+                "restarted": "Não há música anterior, então {song} recomeçou do início.",
+                "noPrevious": "Não há música anterior para voltar."
+            },
+            "clear": {
+                "description": "Esvazia a fila e mantém a música atual",
+                "nothing": "Não há nada esperando na fila para remover."
+            },
+            "move": {
+                "description": "Move uma música para outra posição na fila",
+                "usage": "{prefix}move <de> <para>",
+                "slashFromDescription": "Posição na fila da música a mover",
+                "slashToDescription": "Posição da fila para onde mover",
+                "moved": "Movi {song} para a posição {position}.",
+                "invalid": "Informe duas posições diferentes da lista da fila. A música que está tocando não pode ser movida, e nada pode ficar na frente dela."
+            },
+            "playNext": {
+                "description": "Adiciona uma música para tocar logo depois da atual",
+                "usage": "{prefix}playnext <busca | url | arquivo anexado>"
+            },
+            "leave": {
+                "description": "Para o player de música e sai do canal de voz"
             }
         }
     },
@@ -419,7 +444,12 @@
         "noChannel": "Nenhum canal de pedidos está definido atualmente.",
         "currentChannel": "Canal de pedidos atual: {channel}",
         "skipInProgress": "Por favor aguarde, uma operação de pular está em andamento.",
-        "noPermission": "Você não tem permissão para realizar esta ação. Apenas o cargo DJ, gerentes do servidor ou quem solicitou a música podem fazer isso."
+        "noPermission": "Você não tem permissão para realizar esta ação. Apenas o cargo DJ, gerentes do servidor ou quem solicitou a música podem fazer isso.",
+        "ends": "Termina {time}",
+        "upNext": "A seguir",
+        "jumpPlaceholder": "Pular para uma música da fila",
+        "addModalTitle": "Adicionar à fila",
+        "addModalLabel": "Nome da música ou URL"
     },
     "reusable": {
         "invalidUsage": "Uso inválido, por favor use {prefix} {name} para mais informações.",
