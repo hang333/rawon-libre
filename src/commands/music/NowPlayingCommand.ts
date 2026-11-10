@@ -20,6 +20,7 @@ import { CommandContext as LocalCommandContext } from "../../structures/CommandC
 import { type Rawon } from "../../structures/Rawon.js";
 import { type QueueSong } from "../../typings/index.js";
 import { haveQueue } from "../../utils/decorators/MusicUtil.js";
+import { assetUrl } from "../../utils/functions/assets.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { createProgressBar } from "../../utils/functions/createProgressBar.js";
 import { formatMarkdownLink } from "../../utils/functions/formatMarkdownLink.js";
@@ -74,12 +75,11 @@ export class NowPlayingCommand extends ContextCommand {
                     "info",
                     `${ctx.guild?.queue?.playing === true ? "▶️" : "⏸️"} **|** `,
                 );
-                const defaultThumb = "https://cdn.stegripe.org/images/icon.png";
                 let thumb: string | undefined = song?.thumbnail;
                 if (typeof thumb !== "string" || !/^https?:\/\//i.test(thumb)) {
-                    thumb = defaultThumb;
+                    thumb = assetUrl(client, "icon");
                 }
-                embed.setThumbnail(thumb);
+                embed.setThumbnail(thumb ?? null);
 
                 const curr = Math.trunc((res?.playbackDuration ?? 0) / 1_000) + seekOffset;
                 let progressLine: string;

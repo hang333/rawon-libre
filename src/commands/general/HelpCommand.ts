@@ -17,6 +17,7 @@ import {
 import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
+import { assetUrl } from "../../utils/functions/assets.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { formatCodeSpan } from "../../utils/functions/formatCodeSpan.js";
 import { getEffectivePrefix } from "../../utils/functions/getEffectivePrefix.js";
@@ -84,7 +85,7 @@ export class HelpCommand extends ContextCommand {
                     text: __mf("commands.general.help.footerString", {
                         prefix: escapeMarkdown(prefix),
                     }),
-                    iconURL: "https://cdn.stegripe.org/images/information.png",
+                    iconURL: assetUrl(client, "information"),
                 })
                 .setThumbnail(ctx.guild?.iconURL({ extension: "png", size: 1_024 }) ?? null);
 
@@ -188,7 +189,7 @@ export class HelpCommand extends ContextCommand {
         }
 
         const infoEmbed = createEmbed("info")
-            .setThumbnail("https://cdn.stegripe.org/images/question_mark.png")
+            .setThumbnail(assetUrl(client, "questionMark") ?? null)
             .setAuthor({
                 name: __mf("commands.general.help.commandDetailTitle", {
                     username: client.user?.username,
@@ -231,7 +232,7 @@ export class HelpCommand extends ContextCommand {
                 text: __mf("commands.general.help.commandUsageFooter", {
                     devOnly: command?.meta.devOnly === true ? "(developer-only command)" : "",
                 }),
-                iconURL: "https://cdn.stegripe.org/images/information.png",
+                iconURL: assetUrl(client, "information"),
             });
 
         await localCtx.send({ embeds: [infoEmbed] }, "editReply");

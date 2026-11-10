@@ -9,7 +9,8 @@ export const BOT_SETTINGS_DEFAULTS: BotSettings = {
     yesEmoji: "✅",
     noEmoji: "❌",
     altPrefix: ["{mention}"],
-    requestChannelSplash: "https://cdn.stegripe.org/images/rawon_splash.png",
+    // Empty: the request channel shows no splash until one is set with the setup command.
+    requestChannelSplash: "",
     defaultVolume: 100,
     musicSelectionType: "message",
     enableAudioCache: true,

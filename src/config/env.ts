@@ -91,5 +91,21 @@ export const devtoolsPort =
 
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
-export const stegripeApiUrl = "https://api.stegripe.org";
+const baseUrlFromEnv = (value: string | undefined): string =>
+    (value ?? "").trim().replace(/\/+$/u, "");
+
+// Every outside host the bot talks to on the operator's behalf is named here, so
+// none of them is a fixed dependency of the fork.
+
+// Only contacted when a lyrics token is set; LRCLIB covers lyrics without one.
+export const stegripeApiUrl =
+    baseUrlFromEnv(process.env.STEGRIPE_API_URL) || "https://api.stegripe.org";
 export const stegripeApiLyricsToken = process.env.STEGRIPE_API_LYRICS_TOKEN ?? "";
+
+// A hastebin-compatible paste server for eval output too long for an embed.
+// Empty means the output is attached to the reply as a file instead.
+export const hasteUrl = baseUrlFromEnv(process.env.HASTE_URL);
+
+// Where icon.png, information.png and question_mark.png are served from.
+// Empty means the bot's own avatar stands in for all three.
+export const assetBaseUrl = baseUrlFromEnv(process.env.ASSET_BASE_URL);

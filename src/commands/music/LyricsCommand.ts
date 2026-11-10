@@ -8,6 +8,7 @@ import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { type LyricsAPIResult, type QueueSong } from "../../typings/index.js";
+import { assetUrl } from "../../utils/functions/assets.js";
 import { chunk } from "../../utils/functions/chunk.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
@@ -121,7 +122,7 @@ export class LyricsCommand extends ContextCommand {
                 lyrics: response.lyrics,
                 song: response.song ?? null,
                 artist: response.artist ?? null,
-                album_art: "https://cdn.stegripe.org/images/icon.png",
+                album_art: assetUrl(client, "icon"),
                 synced: false,
                 url: response.url ?? null,
                 error: false,
@@ -192,7 +193,7 @@ export class LyricsCommand extends ContextCommand {
                 lyrics: lyricsText,
                 song: lyricsResponse.trackName || selectedTrack.trackName,
                 artist: lyricsResponse.artistName || selectedTrack.artistName,
-                album_art: "https://cdn.stegripe.org/images/icon.png",
+                album_art: assetUrl(client, "icon"),
                 synced: !!lyricsResponse.syncedLyrics,
                 url: undefined,
                 error: false,
@@ -253,8 +254,7 @@ export class LyricsCommand extends ContextCommand {
             return;
         }
 
-        const albumArt =
-            songThumbnail ?? data.album_art ?? "https://cdn.stegripe.org/images/icon.png";
+        const albumArt = songThumbnail ?? data.album_art ?? assetUrl(client, "icon") ?? null;
         const lyricsSource =
             (data as LyricsAPIResult<false> & { source?: string }).source ?? "stegripe";
         const pages: string[] = chunk(data.lyrics ?? "", 2_048);

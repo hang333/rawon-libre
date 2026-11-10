@@ -414,7 +414,8 @@ export class RequestChannelManager {
         }
 
         const bs = this.client.data.botSettings;
-        const splash = bs.requestChannelSplash;
+        // No splash is configured out of the box, and an embed rejects an empty URL.
+        const splash = bs.requestChannelSplash.length > 0 ? bs.requestChannelSplash : null;
 
         const __ = i18n__(this.client, guild);
         const __mf = i18n__mf(this.client, guild);
@@ -475,11 +476,11 @@ export class RequestChannelManager {
         const loopEmoji = loopModeEmoji[queue.loopMode] ?? "▶️";
 
         const hasThumbnail = (song?.thumbnail?.length ?? 0) > 0;
-        const imageUrl = hasThumbnail ? song?.thumbnail : splash;
+        const imageUrl = hasThumbnail ? (song?.thumbnail ?? splash) : splash;
 
         const embed = createEmbed("info")
             .setTitle(`🎵  ${__("requestChannel.title")}`)
-            .setImage(imageUrl ?? splash);
+            .setImage(imageUrl);
 
         const guildIcon = guild.iconURL({ size: 2_048 });
         if (guildIcon !== null && guildIcon.length > 0) {

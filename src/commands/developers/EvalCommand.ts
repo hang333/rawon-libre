@@ -1,15 +1,21 @@
 /** biome-ignore-all lint/style/useNamingConvention: disable naming convention rule for this file */
+import { Buffer } from "node:buffer";
 import process from "node:process";
 import { inspect } from "node:util";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
-import { PermissionFlagsBits, type SlashCommandBuilder } from "discord.js";
+import { AttachmentBuilder, PermissionFlagsBits, type SlashCommandBuilder } from "discord.js";
 import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { i18n__ } from "../../utils/functions/i18n.js";
+
+const MAX_FIELD_LENGTH = 1_024;
+const OUTPUT_FILE_NAME = "output.js";
+
+type EvalField = { value: string; files: AttachmentBuilder[] };
 
 @ApplyOptions<Command.Options>({
     name: "eval",
@@ -77,31 +83,29 @@ export class EvalCommand extends ContextCommand {
                 return;
             }
 
-            const cleaned = this.clean(evaled);
-            const output =
-                cleaned.length > 1_024
-                    ? `${await this.hastebin(client, cleaned)}.js`
-                    : `\`\`\`js\n${cleaned}\`\`\``;
+            const output = await this.toField(client, this.clean(evaled));
 
-            embed.addFields([{ name: __("commands.developers.eval.outputString"), value: output }]);
+            embed.addFields([
+                { name: __("commands.developers.eval.outputString"), value: output.value },
+            ]);
             await localCtx
                 .send({
                     embeds: [embed],
+                    files: output.files,
                 })
                 .catch((error: unknown) => this.container.logger.error("PROMISE_ERR:", error));
         } catch (error_) {
-            const cleaned = this.clean(String(error_));
-            const isTooLong = cleaned.length > 1_024;
-            const error = isTooLong
-                ? `${await this.hastebin(client, cleaned)}.js`
-                : `\`\`\`js\n${cleaned}\`\`\``;
+            const error = await this.toField(client, this.clean(String(error_)));
 
             embed
                 .setColor("Red")
-                .addFields([{ name: __("commands.developers.eval.errorString"), value: error }]);
+                .addFields([
+                    { name: __("commands.developers.eval.errorString"), value: error.value },
+                ]);
             await localCtx
                 .send({
                     embeds: [embed],
+                    files: error.files,
                 })
                 .catch((err: unknown) => this.container.logger.error("PROMISE_ERR:", err));
         }
@@ -117,16 +121,46 @@ export class EvalCommand extends ContextCommand {
             .replaceAll("@", `@${String.fromCodePoint(8_203)}`);
     }
 
-    private async hastebin(client: Rawon, text: string): Promise<string> {
+    /**
+     * Fit eval output into an embed field. What is too long for one goes to the
+     * paste server named by HASTE_URL, and with none configured (or the upload
+     * failing) it rides along as a file. Eval output can hold anything the process
+     * can see, so it is never sent to a host the operator did not choose.
+     */
+    private async toField(client: Rawon, text: string): Promise<EvalField> {
+        if (text.length <= MAX_FIELD_LENGTH) {
+            return { value: `\`\`\`js\n${text}\`\`\``, files: [] };
+        }
+
+        const hasteUrl = client.config.hasteUrl;
+        if (hasteUrl.length > 0) {
+            try {
+                return { value: await this.hastebin(client, hasteUrl, text), files: [] };
+            } catch (error) {
+                this.container.logger.warn(
+                    `[EvalCommand] Upload to ${hasteUrl} failed, attaching the output instead:`,
+                    error,
+                );
+            }
+        }
+
+        return {
+            value: `📎 \`${OUTPUT_FILE_NAME}\``,
+            files: [new AttachmentBuilder(Buffer.from(text, "utf8"), { name: OUTPUT_FILE_NAME })],
+        };
+    }
+
+    private async hastebin(client: Rawon, hasteUrl: string, text: string): Promise<string> {
         const result = await client.request
-            .post("https://bin.stegripe.org/documents", {
+            .post(`${hasteUrl}/documents`, {
                 body: text,
                 headers: {
                     "content-type": "text/plain; charset=utf-8",
                 },
+                timeout: { request: 15_000 },
             })
             .json<{ key: string }>();
 
-        return `https://bin.stegripe.org/${result.key}`;
+        return `${hasteUrl}/${result.key}.js`;
     }
 }

@@ -25,6 +25,7 @@ import { CommandContext } from "../structures/CommandContext.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { type ServerQueue } from "../structures/ServerQueue.js";
 import { type LoopMode, type LyricsAPIResult, type QueueSong } from "../typings/index.js";
+import { assetUrl } from "../utils/functions/assets.js";
 import { chunk } from "../utils/functions/chunk.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatMarkdownLink } from "../utils/functions/formatMarkdownLink.js";
@@ -1507,9 +1508,10 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                 }
 
                 const albumArt =
-                    currentSong.song.thumbnail ??
+                    (currentSong.song.thumbnail || undefined) ??
                     data.album_art ??
-                    "https://cdn.stegripe.org/images/icon.png";
+                    assetUrl(client, "icon") ??
+                    null;
                 const lyricsSource =
                     (data as LyricsAPIResult<false> & { source?: string }).source ?? "stegripe";
                 const pages: string[] = chunk(data.lyrics ?? "", 2_048);
