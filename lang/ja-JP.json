@@ -242,8 +242,10 @@
                 "alreadyPlaying": "そのプレイヤーは{voiceChannel}ですでに再生しています。",
                 "description": "音楽を再生",
                 "noSongData": "そのURLは曲データを含んでいません。",
+                "slashFileDescription": "検索の代わりに再生する音声・動画ファイル",
                 "slashQueryDescription": "検索キーワード",
-                "usage": "{prefix}play <キーワード | URL>"
+                "unsupportedAttachment": "その添付ファイルは再生できる音声・動画ファイルではありません。",
+                "usage": "{prefix}play <キーワード | URL | 添付ファイル>"
             },
             "queue": {
                 "description": "キューリストを表示"

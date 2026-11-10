@@ -145,7 +145,10 @@ export async function getStream(
         };
     }
 
-    const enableAudioCache = client.data.botSettings.enableAudioCache;
+    // A pinned track only exists in the cache by the time it plays, so the cache is
+    // consulted for it even when caching is switched off.
+    const enableAudioCache =
+        client.data.botSettings.enableAudioCache || client.audioCache.isPinned(url);
 
     if (enableAudioCache && !isLive && seekSeconds > 0) {
         client.logger.info(

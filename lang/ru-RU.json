@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Музыкальный проигрыватель уже активный в канале {voiceChannel}",
                 "description": "Сыграйте музыку",
                 "noSongData": "У этого URL нету данных о песне.",
+                "slashFileDescription": "Аудио- или видеофайл для воспроизведения вместо запроса",
                 "slashQueryDescription": "Запрос для поиска",
-                "usage": "{prefix}play <запрос | url>"
+                "unsupportedAttachment": "Это вложение не является аудио- или видеофайлом, который я могу воспроизвести.",
+                "usage": "{prefix}play <запрос | url | вложенный файл>"
             },
             "queue": {
                 "description": "Показать очередь"

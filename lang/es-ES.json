@@ -242,8 +242,10 @@
                 "alreadyPlaying": "El reproductor de música ya está reproduciendo en el canal de voz {voiceChannel}",
                 "description": "Reproduce algo de música",
                 "noSongData": "Este URL no tiene datos de canciones.",
+                "slashFileDescription": "Archivo de audio o vídeo a reproducir en lugar de una búsqueda",
                 "slashQueryDescription": "Canción a reproducir",
-                "usage": "{prefix}play <consulta / url>"
+                "unsupportedAttachment": "Ese archivo adjunto no es un audio o vídeo que pueda reproducir.",
+                "usage": "{prefix}play <consulta / url / archivo adjunto>"
             },
             "queue": {
                 "description": "Muestra la cola de reproducción"

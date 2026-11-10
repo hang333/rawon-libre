@@ -3,8 +3,9 @@ import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import {
+    type Attachment,
     type GuildMember,
-    type Message,
+    Message,
     PermissionFlagsBits,
     type SlashCommandBuilder,
     type VoiceBasedChannel,
@@ -13,6 +14,10 @@ import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { inVC, sameVC, useRequestChannel, validVC } from "../../utils/decorators/MusicUtil.js";
+import {
+    attachmentsToSongs,
+    getPlayableAttachments,
+} from "../../utils/functions/audioAttachment.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { createResolveNotice } from "../../utils/functions/createResolveNotice.js";
 import { formatBoldPrefixedCommand } from "../../utils/functions/formatCodeSpan.js";
@@ -41,13 +46,31 @@ import { checkQuery, handleVideos, searchTrack } from "../../utils/handlers/Gene
                 opt
                     .setName("query")
                     .setDescription(i18n.__("commands.music.play.slashQueryDescription"))
-                    .setRequired(true),
+                    // Optional now that an upload can stand in for it; contextRun
+                    // still insists on one or the other.
+                    .setRequired(false),
+            )
+            .addAttachmentOption((opt) =>
+                opt
+                    .setName("file")
+                    .setDescription(i18n.__("commands.music.play.slashFileDescription"))
+                    .setRequired(false),
             ) as SlashCommandBuilder;
     },
 })
 export class PlayCommand extends ContextCommand {
     private getClient(ctx: CommandContext): Rawon {
         return ctx.client as Rawon;
+    }
+
+    /** Files that came with the request: attached to the message, or the slash option. */
+    private getUploads(ctx: LocalCommandContext): Attachment[] {
+        if (ctx.context instanceof Message) {
+            return [...ctx.context.attachments.values()];
+        }
+
+        const file = ctx.options?.getAttachment("file");
+        return file ? [file] : [];
     }
 
     @useRequestChannel
@@ -84,7 +107,16 @@ export class PlayCommand extends ContextCommand {
                 ? undefined
                 : (localCtx.additionalArgs.get("values") as (string | undefined)[])[0]);
 
-        if ((query?.length ?? 0) === 0) {
+        const uploads = this.getUploads(localCtx);
+        const playableUploads = getPlayableAttachments(uploads);
+
+        if ((query?.length ?? 0) === 0 && playableUploads.length === 0) {
+            if (uploads.length > 0) {
+                return ctx.reply({
+                    embeds: [createEmbed("warn", __("commands.music.play.unsupportedAttachment"))],
+                });
+            }
+
             const prefix = getEffectivePrefix(client, ctx.guild?.id ?? null);
             return ctx.reply({
                 embeds: [
@@ -121,6 +153,16 @@ export class PlayCommand extends ContextCommand {
                     ),
                 ],
             });
+        }
+
+        // An uploaded file is the request itself; text sent along with it is a caption.
+        if (playableUploads.length > 0) {
+            return handleVideos(
+                client,
+                localCtx,
+                await attachmentsToSongs(playableUploads),
+                voiceChannel,
+            );
         }
 
         const queryCheck = checkQuery(query ?? "");

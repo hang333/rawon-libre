@@ -242,8 +242,10 @@
                 "alreadyPlaying": "음악 플레이어가 이미 {voiceChannel} 음성 채널에서 재생 중이에요.",
                 "description": "음악 재생",
                 "noSongData": "해당 URL에는 노래 데이터가 없어요.",
+                "slashFileDescription": "검색어 대신 재생할 오디오 또는 동영상 파일",
                 "slashQueryDescription": "검색어",
-                "usage": "{prefix}play <검색어 | URL>"
+                "unsupportedAttachment": "해당 첨부 파일은 재생할 수 있는 오디오 또는 동영상 파일이 아니에요.",
+                "usage": "{prefix}play <검색어 | URL | 첨부 파일>"
             },
             "queue": {
                 "description": "대기열 목록 보기"

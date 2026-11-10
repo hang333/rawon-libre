@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Le lecteur de musique est déjà en train de jouer sur le salon vocal {voiceChannel}",
                 "description": "Jouer de la musique",
                 "noSongData": "Cette URL ne contient pas de données sur les musiques.",
+                "slashFileDescription": "Fichier audio ou vidéo à lire à la place d'une recherche",
                 "slashQueryDescription": "Requête à rechercher",
-                "usage": "{prefix}play <requête | url>"
+                "unsupportedAttachment": "Cette pièce jointe n'est pas un fichier audio ou vidéo que je peux lire.",
+                "usage": "{prefix}play <requête | url | fichier joint>"
             },
             "queue": {
                 "description": "Afficher la liste de la file d'attente"

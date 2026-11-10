@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Müzik zaten {voiceChannel} ses kanalında çalıyor.",
                 "description": "Biraz müzik çalın",
                 "noSongData": "Bu URL'de herhangi bir şarkı verisi yok.",
+                "slashFileDescription": "Sorgu yerine çalınacak ses veya video dosyası",
                 "slashQueryDescription": "Aranacak sorgu",
-                "usage": "{prefix}play <sorgu | url>"
+                "unsupportedAttachment": "Bu ek, çalabileceğim bir ses veya video dosyası değil.",
+                "usage": "{prefix}play <sorgu | url | ekli dosya>"
             },
             "queue": {
                 "description": "Kuyruk listesini göster"

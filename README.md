@@ -40,6 +40,7 @@ stay AGPL-3.0.
 - Production-ready, no coding required
 - Request channel feature for seamless music experience
 - Support for YouTube, Spotify, SoundCloud, Bilibili, and direct files
+- Play audio or video files uploaded straight to Discord, in the request channel or with `play`
 - Run multiple bot instances for different voice channels
 - Smart audio pre-caching for smoother playback
 - Built-in Google login via Puppeteer for cookie management

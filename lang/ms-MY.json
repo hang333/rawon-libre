@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Pemain muzik sudah pun dimainkan di saluran suara {voiceChannel}",
                 "description": "Jom layan muzik",
                 "noSongData": "Pautan tersebut tidak mempunyai data lagu.",
+                "slashFileDescription": "Fail audio atau video untuk dimainkan sebagai ganti carian",
                 "slashQueryDescription": "Masukkan carian",
-                "usage": "{prefix}play <carian | url>"
+                "unsupportedAttachment": "Lampiran tersebut bukan fail audio atau video yang boleh dimainkan.",
+                "usage": "{prefix}play <carian | url | fail lampiran>"
             },
             "queue": {
                 "description": "Tunjukkan senarai giliran"

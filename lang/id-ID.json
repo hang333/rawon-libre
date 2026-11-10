@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Media player lagi muter lagu di channel {voiceChannel}",
                 "description": "Muter lagu",
                 "noSongData": "Link itu gak punya data lagunya.",
+                "slashFileDescription": "File audio atau video buat diputar, sebagai ganti kata pencarian",
                 "slashQueryDescription": "Kata pencarian",
-                "usage": "{prefix}play <kata pencarian / link>"
+                "unsupportedAttachment": "Lampiran itu bukan file audio atau video yang bisa aku putar.",
+                "usage": "{prefix}play <kata pencarian / link / file terlampir>"
             },
             "queue": {
                 "description": "Cek daftar antrian"

@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Đã phát trong kênh thoại {voiceChannel}",
                 "description": "Phát nhạc",
                 "noSongData": "URL không có dữ liệu bài hát.",
+                "slashFileDescription": "Tệp âm thanh hoặc video để phát thay cho truy vấn",
                 "slashQueryDescription": "Tìm kiếm truy vấn",
-                "usage": "{prefix}play <truy vấn | url>"
+                "unsupportedAttachment": "Tệp đính kèm đó không phải là tệp âm thanh hoặc video mà mình có thể phát.",
+                "usage": "{prefix}play <truy vấn | url | tệp đính kèm>"
             },
             "queue": {
                 "description": "Hiển thị danh sách hàng đợi"

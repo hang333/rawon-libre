@@ -242,8 +242,10 @@
                 "alreadyPlaying": "The music player is already playing in the {voiceChannel} voice channel.",
                 "description": "Play some music",
                 "noSongData": "That URL doesn't have any song data.",
+                "slashFileDescription": "Audio or video file to play instead of a query",
                 "slashQueryDescription": "Query to search",
-                "usage": "{prefix}play <query | url>"
+                "unsupportedAttachment": "That attachment isn't an audio or video file I can play.",
+                "usage": "{prefix}play <query | url | attached file>"
             },
             "queue": {
                 "description": "Show the queue list"

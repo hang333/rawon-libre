@@ -242,8 +242,10 @@
                 "alreadyPlaying": "音乐播放器已经在 {voiceChannel} 语音通讯通道播放。",
                 "description": "播放一些音乐",
                 "noSongData": "该 URL 没有任何歌曲数据。",
+                "slashFileDescription": "要播放的音频或视频文件(代替查询)",
                 "slashQueryDescription": "查询搜索",
-                "usage": "{prefix}play <查询 | url>"
+                "unsupportedAttachment": "该附件不是我能播放的音频或视频文件。",
+                "usage": "{prefix}play <查询 | url | 附件>"
             },
             "queue": {
                 "description": "显示队列列表"

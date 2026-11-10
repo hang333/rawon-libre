@@ -242,8 +242,10 @@
                 "alreadyPlaying": "Медіа програвач вже активний в каналі {voiceChannel}",
                 "description": "Зіграти музику",
                 "noSongData": "Цей URL не має даних про пісню.",
+                "slashFileDescription": "Аудіо- або відеофайл для відтворення замість запиту",
                 "slashQueryDescription": "Запит для пошуку",
-                "usage": "{prefix}play <запит | url>"
+                "unsupportedAttachment": "Це вкладення не є аудіо- або відеофайлом, який я можу відтворити.",
+                "usage": "{prefix}play <запит | url | вкладений файл>"
             },
             "queue": {
                 "description": "Показати чергу"

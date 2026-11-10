@@ -242,8 +242,10 @@
                 "alreadyPlaying": "O player de música já está tocando no canal {voiceChannel}",
                 "description": "Toca uma música",
                 "noSongData": "Essa URL não tem nenhuma música.",
+                "slashFileDescription": "Arquivo de áudio ou vídeo para tocar no lugar de uma busca",
                 "slashQueryDescription": "Busca",
-                "usage": "{prefix}play <busca | url>"
+                "unsupportedAttachment": "Esse anexo não é um arquivo de áudio ou vídeo que eu consiga tocar.",
+                "usage": "{prefix}play <busca | url | arquivo anexado>"
             },
             "queue": {
                 "description": "Mostra as músicas da fila"

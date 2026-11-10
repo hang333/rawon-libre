@@ -36,6 +36,10 @@ export class AudioCacheManager {
         { proc?: ChildProcess; stream?: Readable; writeStreamPath?: string }
     >();
     private readonly failedUrls = new Map<string, { count: number; lastAttempt: number }>();
+    // Tracks whose remote copy is about to disappear, such as an upload whose
+    // message is being deleted. The cached file is then the only copy, so it is
+    // served whatever the audio-cache setting says and is never evicted.
+    private readonly pinnedKeys = new Set<string>();
     private readonly preCacheQueue: string[] = [];
     private isProcessingQueue = false;
 
@@ -102,6 +106,20 @@ export class AudioCacheManager {
     public isInProgress(url: string): boolean {
         const key = this.getCacheKey(url);
         return this.inProgressFiles.has(key);
+    }
+
+    /**
+     * Download a track and keep it until its queue is destroyed, because the
+     * source is not going to stay available. Resolves to whether the file made it
+     * into the cache within the timeout.
+     */
+    public async pin(url: string, timeoutMs = 300_000): Promise<boolean> {
+        this.pinnedKeys.add(this.getCacheKey(url));
+        return this.waitForCache(url, timeoutMs);
+    }
+
+    public isPinned(url: string): boolean {
+        return this.pinnedKeys.has(this.getCacheKey(url));
     }
 
     public getFromCache(url: string): ReadStream | null {
@@ -626,6 +644,10 @@ export class AudioCacheManager {
                     break;
                 }
 
+                if (this.pinnedKeys.has(key)) {
+                    continue;
+                }
+
                 try {
                     if (existsSync(entry.path)) {
                         const fileStats = statSync(entry.path);
@@ -647,6 +669,7 @@ export class AudioCacheManager {
         this.cachedFiles.clear();
         this.inProgressFiles.clear();
         this.failedUrls.clear();
+        this.pinnedKeys.clear();
         this.preCacheQueue.length = 0;
 
         if (existsSync(this.cacheDir)) {
@@ -666,6 +689,7 @@ export class AudioCacheManager {
         for (const url of urls) {
             const key = this.getCacheKey(url);
             this.canceledCacheKeys.add(key);
+            this.pinnedKeys.delete(key);
             const entry = this.cachedFiles.get(key);
             if (entry) {
                 try {

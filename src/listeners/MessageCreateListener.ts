@@ -13,6 +13,8 @@ import {
 } from "discord.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { ServerQueue } from "../structures/ServerQueue.js";
+import { type SearchTrackResult } from "../typings/index.js";
+import { attachmentsToSongs, getPlayableAttachments } from "../utils/functions/audioAttachment.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { createResolveNotice } from "../utils/functions/createResolveNotice.js";
 import { createVoiceAdapter } from "../utils/functions/createVoiceAdapter.js";
@@ -21,6 +23,10 @@ import { formatMarkdownLink } from "../utils/functions/formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
 import { checkQuery, searchTrack } from "../utils/handlers/GeneralUtil.js";
 import { play } from "../utils/handlers/general/play.js";
+
+// How long an uploaded track may take to download into the cache before the
+// request message that carries it is cleared regardless.
+const UPLOAD_CACHE_TIMEOUT_MS = 300_000;
 
 const MUSIC_COMMANDS = [
     "play",
@@ -434,23 +440,33 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
             `[MultiBot] ${client.user?.tag} received request in channel ${message.channel.id} from ${message.author.tag}`,
         );
 
+        const uploads = [...message.attachments.values()];
+        const playableUploads = getPlayableAttachments(uploads);
+
+        // Deleting a message takes its uploads off Discord's CDN with it, so a
+        // request that carries audio stays until that audio is in the local cache.
+        // With several bots every one of them sees the request and would clear it,
+        // but only the bot that queues it knows when caching is done; the others
+        // stand back for as long as caching is allowed to take.
+        const heldFor: Promise<unknown>[] = [];
+        let queuedHere = false;
         setTimeout(() => {
-            void (async (): Promise<void> => {
-                try {
-                    await message.delete();
-                } catch {}
-            })();
+            const standBack = client.config.isMultiBot && playableUploads.length > 0 && !queuedHere;
+            const ready = standBack
+                ? new Promise((resolve) => setTimeout(resolve, UPLOAD_CACHE_TIMEOUT_MS))
+                : Promise.allSettled(heldFor);
+            void ready.then(async () => message.delete().catch(() => null));
         }, 60_000);
 
         const query = message.content.trim();
-        if (query.length === 0) {
+        if (query.length === 0 && uploads.length === 0) {
             return;
         }
 
         const isSearchSelection =
             /^(?:[1-9]|10)(?:\s*,\s*(?:[1-9]|10))*$/u.test(query) ||
             ["c", "cancel"].includes(query.toLowerCase());
-        if (isSearchSelection) {
+        if (isSearchSelection && playableUploads.length === 0) {
             return;
         }
 
@@ -533,19 +549,31 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
             `[MultiBot] ${client.user?.tag} PROCESSING voice channel ${voiceChannel.id} (${voiceChannel.name}) for request from ${message.author.tag}`,
         );
 
-        const queryData = checkQuery(query);
-        const notice = await createResolveNotice(
-            client,
-            message,
-            queryData.type === "playlist" || queryData.type === "artist",
-        );
-        const songs = await searchTrack(client, query, undefined, notice.report).catch(
-            (error: unknown) => {
-                client.logger.error("[RequestChannel] searchTrack failed:", error);
-                return null;
-            },
-        );
-        await notice.dismiss();
+        let songs: SearchTrackResult | null;
+        if (playableUploads.length > 0) {
+            // An uploaded file is the request itself; text sent with it is a caption.
+            songs = { type: "results", items: await attachmentsToSongs(playableUploads) };
+        } else if (query.length === 0) {
+            this.sendTemporaryReply(
+                message,
+                createEmbed("warn", __("commands.music.play.unsupportedAttachment")),
+            );
+            return;
+        } else {
+            const queryData = checkQuery(query);
+            const notice = await createResolveNotice(
+                client,
+                message,
+                queryData.type === "playlist" || queryData.type === "artist",
+            );
+            songs = await searchTrack(client, query, undefined, notice.report).catch(
+                (error: unknown) => {
+                    client.logger.error("[RequestChannel] searchTrack failed:", error);
+                    return null;
+                },
+            );
+            await notice.dismiss();
+        }
         if (!songs || songs.items.length === 0) {
             this.sendTemporaryReply(
                 message,
@@ -624,6 +652,21 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
         for (const song of songs.type === "results" ? songs.items : [songs.items[0]]) {
             guild.queue.songs.addSong(song, member);
         }
+        if (playableUploads.length > 0) {
+            queuedHere = true;
+            for (const song of songs.items) {
+                heldFor.push(
+                    client.audioCache.pin(song.url, UPLOAD_CACHE_TIMEOUT_MS).then((cached) => {
+                        if (!cached) {
+                            client.logger.warn(
+                                `[RequestChannel] Could not cache upload "${song.title}"; it will be unplayable once its message is deleted`,
+                            );
+                        }
+                        return cached;
+                    }),
+                );
+            }
+        }
         if (isNewQueue || wasIdle) {
             void play(guild);
         } else {
@@ -647,6 +690,13 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
             if (songs.playlist.author) {
                 confirmEmbed.setFooter({ text: `📁 ${songs.playlist.author}` });
             }
+        } else if (playableUploads.length > 1) {
+            confirmEmbed = createEmbed(
+                "success",
+                `🎶 **|** ${__mf("utils.generalHandler.handleVideoInitial", {
+                    length: songs.items.length,
+                })}`,
+            );
         } else {
             const songTitle = songs.items[0].title;
             const songUrl = songs.items[0].url;
