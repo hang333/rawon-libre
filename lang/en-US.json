@@ -68,7 +68,10 @@
                 "accountNA": "`N/A`",
                 "gettingStartedField": "Getting Started",
                 "gettingStartedText": "Use {loginCmd} to log in to Google and generate cookies automatically.",
-                "statsTitle": "Statistics"
+                "statsTitle": "Statistics",
+                "tunnelDm": "Open this link to reach the login browser, then sign in with your Google account. Anyone who has the link can control that browser until the login ends, so keep it to yourself.",
+                "tunnelSent": "The link to the login browser was sent to you in a direct message. Open it and sign in with your Google account; the bot notices when you are done.",
+                "tunnelFailed": "A tunnel could not be opened ({reason}), so the link below only works on the machine the bot runs on."
             },
             "setup": {
                 "description": "Configure bot settings (developer only)",

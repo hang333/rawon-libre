@@ -158,6 +158,13 @@ The `/app/cache` volume stores:
 #### Port Information
 The `DEVTOOLS_PORT` (default: `3000`) is used for Chrome DevTools remote debugging proxy. This is required for `!login start` to work from a remote machine. Set `DEVTOOLS_PORT` in your `dev.env` file to use a different port.
 
+The port is only listened on while a login is in progress, and it has no authentication of its
+own: whoever can reach it during that time controls the login browser. Publish it to an address
+you trust (for example `127.0.0.1:3000:3000`, reached over an SSH tunnel) rather than to the
+internet. Alternatively set `DEVTOOLS_TUNNEL=yes` and drop the port mapping altogether: the bot
+then opens a Cloudflare quick tunnel for the duration of the login and sends you the link in a
+direct message. See [Cookies Setup](./docs/COOKIES_SETUP.md).
+
 ## Configuration Files
 - `.env.example` - Essential settings (Discord/Spotify token, prefix, IDs, etc.)
 - `dev.env.example` - Optional developer settings (prefix/slash toggles, sharding, DevTools, debug mode, etc.)

@@ -25,6 +25,7 @@ import {
 import { container } from "@sapphire/framework";
 import Database from "better-sqlite3";
 import puppeteer, { type Browser, type Cookie, type Page, type Target } from "puppeteer-core";
+import { QuickTunnel } from "./QuickTunnel.js";
 
 export type LoginStatus = "idle" | "waiting_for_login" | "logged_in" | "error";
 
@@ -35,6 +36,13 @@ export interface LoginSessionInfo {
     status: LoginStatus;
     debugUrl: string | null;
     inspectUrl: string | null;
+    /**
+     * True when `inspectUrl` goes through a public tunnel: whoever holds it can
+     * drive the login browser, so it must only reach the person logging in.
+     */
+    inspectUrlIsPublic: boolean;
+    /** Why a tunnel that was asked for could not be opened, if it could not. */
+    tunnelError: string | null;
     loginUrl: string | null;
     email: string | null;
     lastCookieRefresh: number | null;
@@ -90,7 +98,14 @@ export class GoogleLoginManager {
     private proxyServer: Server | null = null;
     private visitorData: string | null = null;
 
-    public constructor(chromiumPath?: string, devtoolsPort = 3000) {
+    private readonly tunnel: QuickTunnel | null;
+    private publicBase: string | null = null;
+    private tunnelError: string | null = null;
+    private cancelRequested = false;
+    private finishLoginWait: ((loggedIn: boolean) => void) | null = null;
+
+    public constructor(chromiumPath?: string, devtoolsPort = 3000, useTunnel = false) {
+        this.tunnel = useTunnel ? new QuickTunnel() : null;
         const cacheDir = path.resolve(process.cwd(), "cache");
 
         this.paths = {
@@ -316,6 +331,8 @@ export class GoogleLoginManager {
             status: this.status,
             debugUrl: this.debugUrl,
             inspectUrl: this.inspectUrl,
+            inspectUrlIsPublic: this.inspectUrl !== null && this.publicBase !== null,
+            tunnelError: this.tunnelError,
             loginUrl: this.currentLoginUrl ?? this.page?.url() ?? null,
             email: this.loginEmail,
             lastCookieRefresh: this.lastCookieRefresh,
@@ -748,6 +765,7 @@ export class GoogleLoginManager {
         await this.startDevtoolsProxy(port, chromeDebugPort);
         this.actualPort = port;
         this.debugUrl = this.getDevtoolsBaseUrl();
+        await this.openTunnel(chromeDebugPort);
 
         this.browser.on("disconnected", () => {
             container.logger.warn("[GoogleLogin] Browser disconnected");
@@ -825,6 +843,55 @@ export class GoogleLoginManager {
             this.proxyServer.close();
             this.proxyServer = null;
         }
+
+        // Every way out of a login session passes through here, and none of
+        // them may leave the browser reachable from outside.
+        this.tunnel?.stop();
+        this.publicBase = null;
+    }
+
+    /**
+     * Make the login browser reachable from outside through a quick tunnel,
+     * when the operator has asked for one. Failing to is not fatal: the login
+     * then works as it does without a tunnel, from the bot's own machine.
+     */
+    private async openTunnel(chromeDebugPort: number): Promise<void> {
+        this.tunnelError = null;
+        if (this.tunnel === null) {
+            return;
+        }
+
+        try {
+            this.publicBase = await this.tunnel.start(chromeDebugPort);
+            container.logger.info("[GoogleLogin] Quick tunnel opened for the login session.");
+        } catch (error) {
+            this.publicBase = null;
+            this.tunnelError = (error as Error).message;
+            container.logger.warn(
+                `[GoogleLogin] Could not open a quick tunnel: ${this.tunnelError}`,
+            );
+        }
+    }
+
+    /** The address at which DevTools shows the given page of the login browser. */
+    private formatInspectUrl(pageId: string): string {
+        if (this.publicBase !== null) {
+            // The tunnel is https, where a page may only open a secure socket.
+            const host = new URL(this.publicBase).host;
+            return `${this.publicBase}/devtools/inspector.html?wss=${host}/devtools/page/${pageId}`;
+        }
+
+        const local = `127.0.0.1:${this.actualPort ?? this.devtoolsPort}`;
+        return `http://${local}/devtools/inspector.html?ws=${local}/devtools/page/${pageId}`;
+    }
+
+    /**
+     * Give up a login that is waiting for the user. The session then ends the
+     * way a timeout does, which closes the browser and whatever led to it.
+     */
+    public cancelLogin(): void {
+        this.cancelRequested = true;
+        this.finishLoginWait?.(false);
     }
 
     private async buildInspectUrl(): Promise<string | null> {
@@ -841,7 +908,7 @@ export class GoogleLoginManager {
                 }>;
 
                 if (pages.length > 0 && pages[0].id) {
-                    return `http://${host}:${port}/devtools/inspector.html?ws=${host}:${port}/devtools/page/${pages[0].id}`;
+                    return this.formatInspectUrl(pages[0].id);
                 }
             } catch {
                 if (attempt < 2) {
@@ -864,6 +931,7 @@ export class GoogleLoginManager {
 
         this.status = "waiting_for_login";
         this.error = null;
+        this.cancelRequested = false;
 
         try {
             await this.navigateToLoginPage();
@@ -1029,7 +1097,7 @@ export class GoogleLoginManager {
             throw new Error("Could not determine login page target ID");
         }
 
-        this.inspectUrl = `http://${host}:${port}/devtools/inspector.html?ws=${host}:${port}/devtools/page/${this.loginTargetId}`;
+        this.inspectUrl = this.formatInspectUrl(this.loginTargetId);
         this.currentLoginUrl = loginUrl;
     }
 
@@ -1299,6 +1367,16 @@ export class GoogleLoginManager {
         const host = "127.0.0.1";
 
         return new Promise<boolean>((resolve) => {
+            // Cancelled while the login page was still loading.
+            if (this.cancelRequested) {
+                resolve(false);
+                return;
+            }
+            this.finishLoginWait = (loggedIn) => {
+                this.cleanupLoginWait();
+                resolve(loggedIn);
+            };
+
             this.loginCheckInterval = setInterval(async () => {
                 try {
                     const response = await fetch(`http://${host}:${port}/json`);
@@ -1344,6 +1422,7 @@ export class GoogleLoginManager {
     }
 
     private cleanupLoginWait(): void {
+        this.finishLoginWait = null;
         if (this.loginCheckInterval) {
             clearInterval(this.loginCheckInterval);
             this.loginCheckInterval = null;

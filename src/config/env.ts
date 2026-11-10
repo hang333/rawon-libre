@@ -89,6 +89,12 @@ const rawDevtoolsPort = Number(process.env.DEVTOOLS_PORT);
 export const devtoolsPort =
     Number.isFinite(rawDevtoolsPort) && rawDevtoolsPort > 0 ? rawDevtoolsPort : 3000;
 
+// Whether the login command reaches its browser through a Cloudflare quick
+// tunnel instead of the DevTools port. Off unless asked for: it runs
+// cloudflared, fetching it on first use, and puts the login browser on a
+// public address for as long as a login is in progress.
+export const devtoolsTunnel = process.env.DEVTOOLS_TUNNEL?.trim().toLowerCase() === "yes";
+
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
 // Where a plain-text search looks first. Anything other than "youtube" keeps the

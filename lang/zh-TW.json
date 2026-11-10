@@ -68,7 +68,10 @@
                 "accountNA": "`N/A`",
                 "gettingStartedField": "開始使用",
                 "gettingStartedText": "使用 {loginCmd} 登入Google並自動產生cookies。",
-                "statsTitle": "統計"
+                "statsTitle": "統計",
+                "tunnelDm": "打開下面的連結進入登入用的瀏覽器，然後用你的 Google 帳號登入。在登入結束之前，任何拿到這個連結的人都能操控該瀏覽器，請不要轉發。",
+                "tunnelSent": "登入瀏覽器的連結已透過私訊發給你。打開它並用 Google 帳號登入，機器人會自動偵測登入是否完成。",
+                "tunnelFailed": "無法建立隧道（{reason}），所以下面的連結只能在機器人所在的機器上打開。"
             },
             "setup": {
                 "description": "設定機器人配置（僅限開發者）",

@@ -142,20 +142,73 @@ export class LoginCommand extends ContextCommand {
             const sessionInfo = loginManager.getSessionInfo();
             const timeoutMinutes = Math.floor(loginManager.getLoginTimeoutMs() / 60_000);
 
-            if (sessionInfo.inspectUrl) {
+            const timeLimit = __mf("commands.developers.login.timeLimit", {
+                minutes: `\`${String(timeoutMinutes)}\``,
+            });
+
+            if (sessionInfo.inspectUrl && sessionInfo.inspectUrlIsPublic) {
+                // Whoever opens this link drives the login browser, so it goes
+                // to the person who asked for it and to nobody else. Without a
+                // way to reach them privately the login is called off rather
+                // than posted where others can read it.
+                const delivered = await ctx.author
+                    .send({
+                        embeds: [
+                            createEmbed("info")
+                                .setTitle(__("commands.developers.login.sessionTitle"))
+                                .setDescription(
+                                    `${__("commands.developers.login.tunnelDm")}\n\n` +
+                                        `${sessionInfo.inspectUrl}\n\n${timeLimit}`,
+                                ),
+                        ],
+                    })
+                    .then(() => true)
+                    .catch(() => false);
+
+                if (!delivered) {
+                    loginManager.cancelLogin();
+                    await loginPromise.catch(() => false);
+                    await statusMsg?.edit({
+                        embeds: [
+                            createEmbed(
+                                "error",
+                                __("commands.developers.database.dmFailed"),
+                                true,
+                            ).setTitle(__("commands.developers.login.loginFailed")),
+                        ],
+                    });
+                    return statusMsg ?? undefined;
+                }
+
                 await statusMsg?.edit({
                     embeds: [
                         createEmbed("info")
                             .setTitle(__("commands.developers.login.sessionTitle"))
                             .setDescription(
-                                `${__("commands.developers.login.sessionDescription")}\n\n` +
+                                `${__("commands.developers.login.tunnelSent")}\n\n${timeLimit}`,
+                            ),
+                    ],
+                });
+            } else if (sessionInfo.inspectUrl) {
+                // A tunnel was asked for and could not be opened: say so, since
+                // the link below then only works on the bot's own machine.
+                const tunnelNote =
+                    sessionInfo.tunnelError === null
+                        ? ""
+                        : `${__mf("commands.developers.login.tunnelFailed", {
+                              reason: `\`${sessionInfo.tunnelError.slice(0, 200)}\``,
+                          })}\n\n`;
+
+                await statusMsg?.edit({
+                    embeds: [
+                        createEmbed("info")
+                            .setTitle(__("commands.developers.login.sessionTitle"))
+                            .setDescription(
+                                `${tunnelNote}${__("commands.developers.login.sessionDescription")}\n\n` +
                                     `${__("commands.developers.login.step1WithUrl")}\n` +
                                     `${__("commands.developers.login.step2WithUrl")}\n` +
                                     `${__("commands.developers.login.step3")}\n` +
-                                    `${__mf("commands.developers.login.step4", { url: sessionInfo.inspectUrl })}\n\n` +
-                                    __mf("commands.developers.login.timeLimit", {
-                                        minutes: `\`${String(timeoutMinutes)}\``,
-                                    }),
+                                    `${__mf("commands.developers.login.step4", { url: sessionInfo.inspectUrl })}\n\n${timeLimit}`,
                             ),
                     ],
                 });

@@ -76,6 +76,31 @@ ports:
   - "${DEVTOOLS_PORT:-3000}:${DEVTOOLS_PORT:-3000}"
 ```
 
+The link the bot gives is for `127.0.0.1`. From another machine, replace that with the server's
+address, or forward the port over SSH (`ssh -L 3000:127.0.0.1:3000 user@server`) and use the link
+as it is. The port has no authentication: while a login is in progress, whoever can reach it
+controls the login browser. Do not publish it to the internet.
+
+### Logging in Through a Quick Tunnel
+
+If you would rather not publish a port at all, set this in `dev.env`:
+
+```env
+DEVTOOLS_TUNNEL="yes"
+```
+
+`!login start` then opens a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+to the login browser and sends you an `https://….trycloudflare.com` link **in a direct message**.
+No Cloudflare account is needed, and the port mapping can be removed from `docker-compose.yaml`.
+
+- The bot runs `cloudflared`. If it is not installed, the bot downloads the official release for
+  Linux or Windows into `cache/scripts` the first time a tunnel is needed.
+- The tunnel is closed as soon as the login succeeds, fails or times out.
+- The link is the only thing protecting the login browser. Anyone who has it can control that
+  browser until the login ends, so do not forward it.
+- The bot must be able to message you: allow direct messages from the server you run the command
+  in. If it cannot, the login is cancelled rather than the link being posted in the channel.
+
 ### How Long Do Cookies Last?
 
 Cookies may become stale over time due to server-side rotation. They will generally remain valid as long as:
@@ -106,7 +131,7 @@ When cookies go stale, simply re-login using `!login logout` followed by `!login
 
 If you prefer not to use the login command, you can still manually place a Netscape-format cookie file at:
 ```
-cache/cookies.txt
+cache/cookies/cookies.txt
 ```
 
 The bot will use this file if it exists. However, the `!login` method is recommended as it provides a simpler workflow.
@@ -222,7 +247,7 @@ Jika cookies kedaluwarsa, cukup login ulang menggunakan `!login logout` diikuti 
 
 Jika kamu tidak ingin menggunakan command login, kamu masih bisa menaruh file cookie berformat Netscape secara manual di:
 ```
-cache/cookies.txt
+cache/cookies/cookies.txt
 ```
 
 Bot akan menggunakan file ini jika ada. Namun, metode `!login` lebih direkomendasikan karena menyediakan alur kerja yang lebih sederhana.

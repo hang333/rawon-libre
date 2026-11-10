@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { container } from "@sapphire/framework";
-import { devtoolsPort } from "../../config/env.js";
+import { devtoolsPort, devtoolsTunnel } from "../../config/env.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { formatPrefixedCommand } from "../../utils/functions/formatCodeSpan.js";
 import { getEffectivePrefix } from "../../utils/functions/getEffectivePrefix.js";
@@ -24,7 +24,7 @@ let sharedLoginManager: GoogleLoginManager | null = null;
 function getSharedLoginManager(): GoogleLoginManager {
     if (!sharedLoginManager) {
         const chromiumPath = process.env.CHROMIUM_PATH || undefined;
-        sharedLoginManager = new GoogleLoginManager(chromiumPath, devtoolsPort);
+        sharedLoginManager = new GoogleLoginManager(chromiumPath, devtoolsPort, devtoolsTunnel);
     }
     return sharedLoginManager;
 }
