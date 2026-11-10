@@ -25,6 +25,10 @@ export function checkQuery(string: string): QueryData {
 
         const isYouTube = /youtube/gu.test(url.hostname);
         const isYouTuBe = /youtu\.be/gu.test(url.hostname);
+        // The URL parser never yields an empty pathname: a bare https://youtu.be is
+        // "/", and https://youtu.be// keeps both slashes. Only a path with a real
+        // segment carries a video id.
+        const hasShortLinkId = url.pathname.split("/").some((segment) => segment.length > 0);
 
         if ((!isYouTuBe && url.pathname.startsWith("/playlist")) || url.searchParams.has("list")) {
             result.type = "playlist";
@@ -33,7 +37,7 @@ export function checkQuery(string: string): QueryData {
                 (url.pathname.startsWith("/watch") ||
                     url.pathname.startsWith("/shorts/") ||
                     url.pathname.startsWith("/live/"))) ||
-            (isYouTuBe && url.pathname !== "")
+            (isYouTuBe && hasShortLinkId)
         ) {
             result.type = "track";
         } else {
