@@ -1,9 +1,7 @@
-ignoredBuiltDependencies:
-  - puppeteer
-
-onlyBuiltDependencies:
-  - "@swc/core"
-  - better-sqlite3
-  - ffmpeg-static
-  - protobufjs
-  - unrs-resolver
+allowBuilds:
+  "@swc/core": true
+  better-sqlite3: true
+  ffmpeg-static: true
+  protobufjs: true
+  puppeteer: false
+  unrs-resolver: true

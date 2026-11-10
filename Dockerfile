@@ -1,7 +1,9 @@
-FROM node:24-alpine AS build-stage
+FROM node:26-alpine AS build-stage
 
+# Node 25 and later no longer ship corepack, so pnpm comes from npm. npm leaves
+# pnpm's install scripts unrun; its bins then start through Node.js, which is fine here.
 RUN apk add --no-cache python3 make g++ && \
-    corepack enable && corepack prepare pnpm@10.12.1 --activate
+    npm install --global pnpm@12.18.0
 
 WORKDIR /tmp/build
 
@@ -16,7 +18,7 @@ RUN echo "COMMIT_SHA=${COMMIT_SHA:-Unknown}" > /tmp/build/.env.build
 RUN pnpm build
 RUN pnpm prune --production
 
-FROM node:24-alpine
+FROM node:26-alpine
 
 LABEL name="rawon-libre"
 LABEL maintainer="hang333 <jonathan.goh333@gmail.com>"

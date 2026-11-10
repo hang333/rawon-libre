@@ -48,8 +48,8 @@ stay AGPL-3.0.
 ## Installation
 
 ### Prerequisites
-- [Node.js](https://nodejs.org) version `22.12.0` or higher (Node 20 reached end-of-life on
-  2026-04-30, and puppeteer 25 requires 22.12+)
+- [Node.js](https://nodejs.org) version `22.14.0` or higher (Node 20 reached end-of-life on
+  2026-04-30, and better-sqlite3 13 crashes on anything older than 22.14)
 - [FFmpeg](https://ffmpeg.org/) for audio processing
 
 > **Note**: Docker users don't need to install FFmpeg manually — it's included in the Docker image.
