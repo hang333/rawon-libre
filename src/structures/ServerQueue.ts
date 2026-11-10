@@ -819,10 +819,8 @@ export class ServerQueue {
             (async () => {
                 await this.textChannel.messages
                     .fetch(this._lastMusicMsg ?? "")
-                    .then((msg) => {
-                        void msg.delete();
-                        return 0;
-                    })
+                    // Returned, not voided, so a failed delete reaches the catch below.
+                    .then(async (msg) => msg.delete())
                     .catch((error: unknown) => {
                         const discordError = error as { code?: number };
                         if (discordError.code !== 10008) {
@@ -846,10 +844,8 @@ export class ServerQueue {
             (async () => {
                 await this.textChannel.messages
                     .fetch(this._lastVSUpdateMsg ?? "")
-                    .then((msg) => {
-                        void msg.delete();
-                        return 0;
-                    })
+                    // Returned, not voided, so a failed delete reaches the catch below.
+                    .then(async (msg) => msg.delete())
                     .catch((error: unknown) => {
                         const discordError = error as { code?: number };
                         if (discordError.code !== 10008) {

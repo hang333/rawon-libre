@@ -209,7 +209,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                         VoiceConnectionStatus.Ready,
                         20_000,
                     );
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "success",
@@ -217,7 +217,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                                 true,
                             ),
                         ],
-                    });
+                    }).catch(() => null);
                     if (isRequestChannel) {
                         setTimeout(() => {
                             void msg.delete().catch(() => null);
@@ -232,7 +232,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                             newState.guild.name
                         } voice channel, the queue was deleted.`,
                     );
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "error",
@@ -240,7 +240,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                                 true,
                             ),
                         ],
-                    });
+                    }).catch(() => null);
                     if (isRequestChannel) {
                         setTimeout(() => {
                             void msg.delete().catch(() => null);
@@ -381,9 +381,11 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                         void msg.delete().catch(() => null);
                     }, 60_000);
                 }
-            })();
+            })().catch(() => null);
         }, timeout);
-        (async () => {
+        // A failed send (the bot lost Send Messages here) must not surface as an
+        // unhandled rejection; the pause itself has already happened.
+        void (async () => {
             const msg = await queue.textChannel.send({
                 flags: MessageFlags.SuppressNotifications,
                 embeds: [
@@ -401,7 +403,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                     void msg.delete().catch(() => null);
                 }, 60_000);
             }
-        })();
+        })().catch(() => null);
     }
 
     /**
@@ -481,7 +483,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             queue.textChannel.id,
         );
 
-        (async () => {
+        void (async () => {
             const msg = await queue.textChannel.send({
                 flags: MessageFlags.SuppressNotifications,
                 embeds: [
@@ -503,7 +505,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                     void msg.delete().catch(() => null);
                 }, 60_000);
             }
-        })();
+        })().catch(() => null);
         guild.queue?.player.unpause();
     }
 }

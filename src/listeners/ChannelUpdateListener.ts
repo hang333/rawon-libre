@@ -60,7 +60,7 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
                 20_000,
             )
                 .then(() => {
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "success",
@@ -68,7 +68,7 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
                                 true,
                             ),
                         ],
-                    });
+                    }).catch(() => null);
                     if (isRequestChannel) {
                         setTimeout(() => {
                             void msg.delete().catch(() => null);
@@ -85,7 +85,7 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
                             newChannel.guild.name
                         } voice channel, the queue was deleted.`,
                     );
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "error",
@@ -93,7 +93,7 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
                                 true,
                             ),
                         ],
-                    });
+                    }).catch(() => null);
                     if (isRequestChannel) {
                         setTimeout(() => {
                             void msg.delete().catch(() => null);

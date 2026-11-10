@@ -57,41 +57,58 @@ export async function play(
             guild,
             queue.textChannel.id,
         );
+        // These notices are courtesy messages. The bot can lose Send Messages, or a
+        // moderator can remove the notice first, and neither is worth an unhandled
+        // rejection in the log.
         if (!isRequestChannel) {
-            void queue.textChannel.send({
-                flags: MessageFlags.SuppressNotifications,
-                embeds: [
-                    createEmbed(
-                        "info",
-                        `⏹️ **|** ${__mf("utils.generalHandler.queueEnded", {
-                            usage: formatBoldPrefixedCommand(
-                                getEffectivePrefix(queue.client, guild.id),
-                                "play",
-                            ),
-                        })}`,
-                    ),
-                ],
-            });
+            queue.textChannel
+                .send({
+                    flags: MessageFlags.SuppressNotifications,
+                    embeds: [
+                        createEmbed(
+                            "info",
+                            `⏹️ **|** ${__mf("utils.generalHandler.queueEnded", {
+                                usage: formatBoldPrefixedCommand(
+                                    getEffectivePrefix(queue.client, guild.id),
+                                    "play",
+                                ),
+                            })}`,
+                        ),
+                    ],
+                })
+                .catch(() => null);
             queue.queueEndedNotified = true;
         }
 
         void queue.client.requestChannelManager.updatePlayerMessage(guild);
 
-        setTimeout(async () => {
-            if (!guild.queue?.songs.first()) {
+        setTimeout(() => {
+            void (async () => {
+                if (guild.queue?.songs.first()) {
+                    return;
+                }
+
                 await queue.destroy();
-                if (!isRequestChannel) {
-                    const msg = await queue.textChannel.send({
+                if (isRequestChannel) {
+                    return;
+                }
+
+                const msg = await queue.textChannel
+                    .send({
                         flags: MessageFlags.SuppressNotifications,
                         embeds: [
                             createEmbed("info", `👋 **|** ${__("utils.generalHandler.leftVC")}`),
                         ],
-                    });
+                    })
+                    .catch(() => null);
+                if (msg) {
                     setTimeout(() => {
-                        void msg.delete();
+                        msg.delete().catch(() => null);
                     }, 3_500);
                 }
-            }
+            })().catch((error: unknown) => {
+                queue.client.logger.error("PLAY_HANDLER_QUEUE_END_ERR:", error);
+            });
         }, 60_000);
         queue.client.debugLog.logData(
             "info",

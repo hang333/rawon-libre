@@ -101,7 +101,7 @@ export class VolumeCommand extends ContextCommand {
                     const newVolume = Number(i.customId);
                     await this.contextRun(newContext as CommandContext & LocalCommandContext);
 
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "info",
@@ -113,11 +113,11 @@ export class VolumeCommand extends ContextCommand {
                             }),
                         ],
                         components: [buttons.toJSON() as APIMessageTopLevelComponent],
-                    });
+                    }).catch(() => null);
                 })
                 .on("end", () => {
                     const cur = ctx.guild?.queue?.volume ?? 0;
-                    void msg.edit({
+                    msg.edit({
                         embeds: [
                             createEmbed(
                                 "info",
@@ -129,7 +129,7 @@ export class VolumeCommand extends ContextCommand {
                             }),
                         ],
                         components: [],
-                    });
+                    }).catch(() => null);
                 });
             return;
         }
