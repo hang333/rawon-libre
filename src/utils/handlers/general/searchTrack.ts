@@ -445,49 +445,40 @@ export async function searchTrack(
 
             result.items = tracks;
         } else {
-            try {
-                const musicSearchRes = await youtubeMusic.search(query, "song");
-                if (musicSearchRes.items.length > 0) {
-                    const tracks = musicSearchRes.items.map(
-                        (track): Song => ({
-                            duration: track.duration ?? 0,
-                            id: track.id,
-                            thumbnail: getYouTubeThumbnail(track.id),
-                            title: track.title,
-                            url: `https://youtube.com/watch?v=${track.id}`,
-                        }),
-                    );
-                    result.items = tracks;
-                } else {
-                    const searchRes = await youtube.search(query, { type: "video" });
-                    const tracks = searchRes.items.map(
-                        (track): Song => ({
-                            duration: track.duration ?? 0,
-                            id: track.id,
-                            thumbnail: getYouTubeThumbnail(track.id),
-                            title: track.title,
-                            url: `https://youtube.com/watch?v=${track.id}`,
-                        }),
-                    );
-                    result.items = tracks;
-                }
-            } catch {
-                try {
-                    const searchRes = await youtube.search(query, { type: "video" });
-                    const tracks = searchRes.items.map(
-                        (track): Song => ({
-                            duration: track.duration ?? 0,
-                            id: track.id,
-                            thumbnail: getYouTubeThumbnail(track.id),
-                            title: track.title,
-                            url: `https://youtube.com/watch?v=${track.id}`,
-                        }),
-                    );
-                    result.items = tracks;
-                } catch {}
+            // "youtube-music" asks the music catalogue first, which favours official
+            // audio over uploads, and only then the video search. "youtube" goes
+            // straight to the video search, for operators who want exactly what a
+            // search on the site would return.
+            let tracks: Song[] = [];
+            if (client.config.searchProvider === "youtube-music") {
+                tracks = await searchYouTubeMusicSongs(query).catch(() => []);
             }
+            if (tracks.length === 0) {
+                tracks = await searchYouTubeVideos(query).catch(() => []);
+            }
+            result.items = tracks;
         }
     }
 
     return result;
+}
+
+function toYouTubeSong(track: { id: string; title: string; duration?: number | null }): Song {
+    return {
+        duration: track.duration ?? 0,
+        id: track.id,
+        thumbnail: getYouTubeThumbnail(track.id),
+        title: track.title,
+        url: `https://youtube.com/watch?v=${track.id}`,
+    };
+}
+
+async function searchYouTubeMusicSongs(query: string): Promise<Song[]> {
+    const found = await youtubeMusic.search(query, "song");
+    return found.items.map((track) => toYouTubeSong(track));
+}
+
+async function searchYouTubeVideos(query: string): Promise<Song[]> {
+    const found = await youtube.search(query, { type: "video" });
+    return found.items.map((track) => toYouTubeSong(track));
 }

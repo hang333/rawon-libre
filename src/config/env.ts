@@ -91,6 +91,12 @@ export const devtoolsPort =
 
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
+// Where a plain-text search looks first. Anything other than "youtube" keeps the
+// default, so a typo cannot leave the bot unable to search.
+export type SearchProvider = "youtube" | "youtube-music";
+export const searchProvider: SearchProvider =
+    process.env.SEARCH_PROVIDER?.trim().toLowerCase() === "youtube" ? "youtube" : "youtube-music";
+
 const baseUrlFromEnv = (value: string | undefined): string =>
     (value ?? "").trim().replace(/\/+$/u, "");
 
