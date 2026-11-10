@@ -31,6 +31,7 @@ import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatMarkdownLink } from "../utils/functions/formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
 import { parseHTMLElements } from "../utils/functions/parseHTMLElements.js";
+import { embedThumbnail } from "../utils/functions/thumbnails.js";
 
 function hasSlashCommand(cmd: Command): boolean {
     return cmd.options.chatInputCommand !== undefined;
@@ -927,7 +928,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                             ? `**${formatMarkdownLink(skipSong.song.title, skipSong.song.url)}**`
                             : "",
                     })}`,
-                ).setThumbnail(skipSong?.song.thumbnail ?? null);
+                ).setThumbnail(embedThumbnail(skipSong?.song.thumbnail));
 
                 await interaction.reply({
                     flags: MessageFlags.Ephemeral,

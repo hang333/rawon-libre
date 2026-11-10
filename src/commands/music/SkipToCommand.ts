@@ -19,6 +19,7 @@ import { formatBoldPrefixedCommand } from "../../utils/functions/formatCodeSpan.
 import { formatMarkdownLink } from "../../utils/functions/formatMarkdownLink.js";
 import { getEffectivePrefix } from "../../utils/functions/getEffectivePrefix.js";
 import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
+import { embedThumbnail } from "../../utils/functions/thumbnails.js";
 import { play } from "../../utils/handlers/GeneralUtil.js";
 
 @ApplyOptions<Command.Options>({
@@ -222,7 +223,7 @@ export class SkipToCommand extends ContextCommand {
                     `⏭️ **|** ${__mf("commands.music.skipTo.skipMessage", {
                         song: `**${formatMarkdownLink(song.song.title, song.song.url)}**`,
                     })}`,
-                ).setThumbnail(song.song.thumbnail),
+                ).setThumbnail(embedThumbnail(song.song.thumbnail)),
             ],
         });
     }

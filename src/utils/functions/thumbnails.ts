@@ -33,6 +33,15 @@ export function getSoundCloudThumbnail(url: string | undefined | null): string {
 }
 
 /**
+ * What to hand an embed for a track's artwork. An embed rejects anything that is
+ * not an http(s) URL, and a track without artwork (an uploaded file, a SoundCloud
+ * track with no cover) carries an empty string rather than nothing.
+ */
+export function embedThumbnail(url: string | null | undefined): string | null {
+    return typeof url === "string" && /^https?:\/\//iu.test(url) ? url : null;
+}
+
+/**
  * Bring a YouTube thumbnail URL that came from somewhere else onto the same size as
  * the ones built here, so that a queue does not mix 120x90 stills with full-size art.
  * Non-YouTube URLs are returned untouched.

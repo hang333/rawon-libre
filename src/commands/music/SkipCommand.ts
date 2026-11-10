@@ -11,6 +11,7 @@ import { haveQueue, inVC, sameVC, useRequestChannel } from "../../utils/decorato
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { formatMarkdownLink } from "../../utils/functions/formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
+import { embedThumbnail } from "../../utils/functions/thumbnails.js";
 import { OperationManager } from "../../utils/structures/OperationManager.js";
 
 @ApplyOptions<Command.Options>({
@@ -139,7 +140,7 @@ export class SkipCommand extends ContextCommand {
                         `⏭️ **|** ${__mf("commands.music.skip.skipMessage", {
                             song: `**${formatMarkdownLink(song.song.title, song.song.url)}**`,
                         })}`,
-                    ).setThumbnail(song.song.thumbnail),
+                    ).setThumbnail(embedThumbnail(song.song.thumbnail)),
                 ],
             })
             .catch((error: unknown) => this.container.logger.error("SKIP_CMD_ERR:", error));

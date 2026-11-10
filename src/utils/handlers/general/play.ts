@@ -21,6 +21,7 @@ import {
 import { formatMarkdownLink } from "../../functions/formatMarkdownLink.js";
 import { getEffectivePrefix } from "../../functions/getEffectivePrefix.js";
 import { i18n__, i18n__mf } from "../../functions/i18n.js";
+import { embedThumbnail } from "../../functions/thumbnails.js";
 import { type FfmpegStreamWithEvents, isErrnoException } from "../../typeGuards.js";
 import {
     AgeRestrictedError,
@@ -388,7 +389,7 @@ export async function play(
                             `🔄 **|** ${__mf("utils.generalHandler.songRequeued", {
                                 song: `**${formatMarkdownLink(song.song.title, song.song.url)}**`,
                             })}`,
-                        ).setThumbnail(song.song.thumbnail),
+                        ).setThumbnail(embedThumbnail(song.song.thumbnail)),
                     ],
                 });
                 setTimeout(() => {

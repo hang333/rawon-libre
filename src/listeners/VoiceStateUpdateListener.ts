@@ -22,6 +22,7 @@ import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatMarkdownLink } from "../utils/functions/formatMarkdownLink.js";
 import { formatMS } from "../utils/functions/formatMS.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
+import { embedThumbnail } from "../utils/functions/thumbnails.js";
 
 @ApplyOptions<ListenerOptions>({
     event: Events.VoiceStateUpdate,
@@ -493,7 +494,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                             song: `**${formatMarkdownLink(song.title, song.url)}**`,
                         })}`,
                     )
-                        .setThumbnail(song.thumbnail)
+                        .setThumbnail(embedThumbnail(song.thumbnail))
                         .setAuthor({
                             name: __("events.voiceStateUpdate.resumeQueueFooter"),
                         }),
