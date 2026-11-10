@@ -1,18 +1,24 @@
 import { AudioPlayerStatus } from "@discordjs/voice";
 import {
     ActionRowBuilder,
-    type APIMessageTopLevelComponent,
     ButtonBuilder,
     ButtonStyle,
-    type EmbedBuilder,
+    type ColorResolvable,
+    ContainerBuilder,
     type Guild,
+    MediaGalleryBuilder,
+    type MessageMentionOptions,
+    resolveColor,
+    SectionBuilder,
+    SeparatorBuilder,
     StringSelectMenuBuilder,
+    TextDisplayBuilder,
+    ThumbnailBuilder,
 } from "discord.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { type ServerQueue } from "../../structures/ServerQueue.js";
-import { type GuildData, type QueueSong } from "../../typings/index.js";
+import { type GuildData, type LoopMode, type QueueSong } from "../../typings/index.js";
 import { type FallbackDataManager, hasGetPlayerState } from "../typeGuards.js";
-import { createEmbed } from "./createEmbed.js";
 import { type filterArgs } from "./ffmpegArgs.js";
 import { formatMarkdownLink } from "./formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "./i18n.js";
@@ -22,13 +28,22 @@ import { embedThumbnail } from "./thumbnails.js";
 /**
  * The player panel is the message that shows what is playing together with the
  * controls for it. It comes in two sizes: "full" is the permanent player of a
- * request channel, with artwork across the whole embed; "compact" is the one
+ * request channel, with artwork across the whole panel; "compact" is the one
  * posted in an ordinary text channel when a track starts.
+ *
+ * A panel is a single container of display components, so that the text, the
+ * artwork and the controls share one frame. A message built this way takes no
+ * content and no embeds, and has to be sent with `MessageFlags.IsComponentsV2`.
  *
  * Every control carries one of these ids, so a panel keeps working for as long
  * as its message exists: nothing about it is held in memory.
  */
 export type PanelVariant = "compact" | "full";
+
+export type PlayerPanel = {
+    components: ContainerBuilder[];
+    allowedMentions: MessageMentionOptions;
+};
 
 export const PANEL_PREFIX = "RC_";
 
@@ -41,16 +56,22 @@ export const PanelId = {
     Loop: "RC_LOOP",
     Shuffle: "RC_SHUFFLE",
     AutoPlay: "RC_AUTOPLAY",
-    VolumeDown: "RC_VOL_DOWN",
-    VolumeUp: "RC_VOL_UP",
-    SeekBack: "RC_SEEK_BACK",
-    SeekForward: "RC_SEEK_FWD",
-    Remove: "RC_REMOVE",
     Lyrics: "RC_LYRICS",
     Add: "RC_ADD",
     AddModal: "RC_ADD_MODAL",
     Jump: "RC_JUMP",
+    /** The menu of less used actions; the option picked is one of the ids below. */
+    More: "RC_MORE",
+    SeekBack: "RC_SEEK_BACK",
+    SeekForward: "RC_SEEK_FWD",
+    Remove: "RC_REMOVE",
+    /** Followed by the volume to set, in percent. */
+    Volume: "RC_VOLUME_",
 } as const;
+
+/** The volumes the "more" menu offers: the steps the `volume` command suggests. */
+export const VOLUME_PRESETS = [10, 25, 50, 75, 100];
+export const SEEK_STEP_SECONDS = 10;
 
 /** Discord allows a select menu this many options. */
 const JUMP_MENU_SIZE = 25;
@@ -62,6 +83,13 @@ const TEMPO_FILTERS: (keyof typeof filterArgs)[] = ["nightcore", "vaporwave", "s
 
 type Translate = (phrase: string) => string;
 type TranslateWith = (phrase: string, values?: Record<string, unknown>) => string;
+
+type PanelSettings = {
+    autoPlay: boolean;
+    loopMode: LoopMode;
+    shuffle: boolean;
+    volume: number;
+};
 
 export function truncate(text: string, limit: number): string {
     return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
@@ -103,6 +131,27 @@ function readSavedState(client: Rawon, guild: Guild): GuildData["playerState"] |
 
     const fallback = client.data as FallbackDataManager;
     return fallback.data?.[guild.id]?.playerState ?? null;
+}
+
+/** What the panel shows as set: the queue's settings, or the saved ones without a queue. */
+function readSettings(client: Rawon, guild: Guild): PanelSettings {
+    const queue = guild.queue;
+    if (queue) {
+        return {
+            autoPlay: queue.autoPlay,
+            loopMode: queue.loopMode,
+            shuffle: queue.shuffle,
+            volume: queue.volume,
+        };
+    }
+
+    const saved = readSavedState(client, guild);
+    return {
+        autoPlay: saved?.autoplay ?? false,
+        loopMode: saved?.loopMode ?? "OFF",
+        shuffle: saved?.shuffle === true,
+        volume: saved?.volume ?? client.data.botSettings.defaultVolume,
+    };
 }
 
 /**
@@ -153,71 +202,28 @@ function describeProgress(
         : `${duration} • ${__mf("requestChannel.ends", { time: `<t:${endsAt}:R>` })}`;
 }
 
-export function buildPlayerEmbed(client: Rawon, guild: Guild, variant: PanelVariant): EmbedBuilder {
-    const queue = guild.queue;
-    const bs = client.data.botSettings;
-    // No splash is configured out of the box, and an embed rejects an empty URL.
-    const splash = bs.requestChannelSplash.length > 0 ? bs.requestChannelSplash : null;
+/** The text of the panel: the track, how far along it is, and the state of the queue. */
+function describePlayer(
+    queue: ServerQueue | undefined,
+    entry: QueueSong | undefined,
+    settings: PanelSettings,
+    variant: PanelVariant,
+    __: Translate,
+    __mf: TranslateWith,
+): string {
+    const lines: string[] = [];
 
-    const __ = i18n__(client, guild);
-    const __mf = i18n__mf(client, guild);
-    const title = `🎵  ${__("requestChannel.title")}`;
-
-    if (!queue || queue.songs.size === 0) {
-        const saved = readSavedState(client, guild);
-
-        return createEmbed(
-            "info",
+    if (queue === undefined || entry === undefined) {
+        lines.push(
+            `### 🎵 ${__("requestChannel.title")}`,
             __(variant === "full" ? "requestChannel.standby" : "requestChannel.nothingPlaying"),
-        )
-            .setTitle(title)
-            .setImage(variant === "full" ? splash : null)
-            .addFields([
-                {
-                    name: __("requestChannel.status"),
-                    value: `▶️ ${saved?.loopMode ?? "OFF"}`,
-                    inline: true,
-                },
-                {
-                    name: __("requestChannel.shuffle"),
-                    value: `🔀 ${saved?.shuffle === true ? "ON" : "OFF"}`,
-                    inline: true,
-                },
-                {
-                    name: __("requestChannel.volume"),
-                    value: `🔊 ${saved?.volume ?? bs.defaultVolume}%`,
-                    inline: true,
-                },
-            ])
-            .setFooter({
-                text: formatQueueFooter(0, "0:00", saved?.autoplay ?? false, __, __mf),
-            });
-    }
-
-    // Between two tracks the player holds nothing; show the one about to start.
-    const entry = queue.currentSong ?? queue.songs.sortByIndex().first();
-    const artwork = embedThumbnail(entry?.song.thumbnail);
-    const embed = createEmbed("info").setTitle(title);
-
-    if (variant === "full") {
-        embed.setImage(artwork ?? splash);
-
-        const guildIcon = guild.iconURL({ size: 2_048 });
-        if (guildIcon !== null && guildIcon.length > 0) {
-            embed.setThumbnail(guildIcon);
-        }
+        );
     } else {
-        embed.setThumbnail(artwork);
-    }
-
-    if (entry) {
-        const lines = [
+        lines.push(
             `### ${formatMarkdownLink(entry.song.title, entry.song.url)}`,
-            "",
             describeProgress(queue, entry, __, __mf),
-            "",
             `${__("requestChannel.requestedBy")}: ${entry.requester.toString()}`,
-        ];
+        );
 
         const next = queue.peekNext();
         if (next !== undefined) {
@@ -225,144 +231,213 @@ export function buildPlayerEmbed(client: Rawon, guild: Guild, variant: PanelVari
                 `⏭️ ${__("requestChannel.upNext")}: ${formatMarkdownLink(next.title, next.url)}`,
             );
         }
-
-        embed.setDescription(lines.join("\n"));
-    } else {
-        embed.setDescription(`▶️ ${__("requestChannel.standby")}`);
     }
 
-    const loopEmoji: Record<string, string> = { OFF: "▶️", SONG: "🔂", QUEUE: "🔁" };
-    embed.addFields([
-        {
-            name: __("requestChannel.status"),
-            value: `${loopEmoji[queue.loopMode] ?? "▶️"} ${queue.loopMode}`,
-            inline: true,
-        },
-        {
-            name: __("requestChannel.shuffle"),
-            value: `🔀 ${queue.shuffle ? "ON" : "OFF"}`,
-            inline: true,
-        },
-        {
-            name: __("requestChannel.volume"),
-            value: `🔊 ${queue.volume}%`,
-            inline: true,
-        },
-    ]);
+    const totalDuration = (queue?.songs.map((queued) => queued.song.duration) ?? []).reduce(
+        (acc, duration) => acc + duration,
+        0,
+    );
+    const footer = formatQueueFooter(
+        queue?.songs.size ?? 0,
+        totalDuration > 0 ? formatDuration(totalDuration) : "0:00",
+        settings.autoPlay,
+        __,
+        __mf,
+    );
+    lines.push(`-# 🔊 ${settings.volume}% ${footer}`);
 
-    const totalQueueDuration = queue.songs
-        .map((queued) => queued.song.duration)
-        .reduce((acc, duration) => acc + duration, 0);
-
-    embed.setFooter({
-        text: formatQueueFooter(
-            queue.songs.size.toString(),
-            totalQueueDuration > 0 ? formatDuration(totalQueueDuration) : "0:00",
-            queue.autoPlay,
-            __,
-            __mf,
-        ),
-    });
-
-    return embed;
+    return lines.join("\n");
 }
 
-export function buildPlayerComponents(
-    client: Rawon,
-    guild: Guild,
+function buildMoreMenu(__: Translate, __mf: TranslateWith): StringSelectMenuBuilder {
+    const seconds = SEEK_STEP_SECONDS;
+
+    return new StringSelectMenuBuilder()
+        .setCustomId(PanelId.More)
+        .setPlaceholder(truncate(__("requestChannel.morePlaceholder"), PLACEHOLDER_LIMIT))
+        .addOptions(
+            {
+                label: truncate(__mf("requestChannel.seekBack", { seconds }), OPTION_TEXT_LIMIT),
+                value: PanelId.SeekBack,
+                emoji: "⏪",
+            },
+            {
+                label: truncate(__mf("requestChannel.seekForward", { seconds }), OPTION_TEXT_LIMIT),
+                value: PanelId.SeekForward,
+                emoji: "⏩",
+            },
+            ...VOLUME_PRESETS.map((percent) => ({
+                label: truncate(`${__("requestChannel.volume")}: ${percent}%`, OPTION_TEXT_LIMIT),
+                value: `${PanelId.Volume}${percent}`,
+                emoji: percent < 50 ? "🔈" : percent < 100 ? "🔉" : "🔊",
+            })),
+            {
+                label: truncate(__("requestChannel.removeCurrent"), OPTION_TEXT_LIMIT),
+                value: PanelId.Remove,
+                emoji: "🗑️",
+            },
+        );
+}
+
+function buildJumpMenu(
+    queue: ServerQueue,
+    upcoming: QueueSong[],
+    __: Translate,
+): StringSelectMenuBuilder {
+    const positions = new Map(queue.listed().map((entry, index) => [entry.key, index + 1]));
+
+    return new StringSelectMenuBuilder()
+        .setCustomId(PanelId.Jump)
+        .setPlaceholder(truncate(__("requestChannel.jumpPlaceholder"), PLACEHOLDER_LIMIT))
+        .addOptions(
+            upcoming.slice(0, JUMP_MENU_SIZE).map((entry) => {
+                const length =
+                    entry.song.isLive === true
+                        ? __("requestChannel.live")
+                        : entry.song.duration > 0
+                          ? normalizeTime(entry.song.duration)
+                          : undefined;
+
+                return {
+                    label: truncate(
+                        `${positions.get(entry.key) ?? "?"}. ${entry.song.title}`,
+                        OPTION_TEXT_LIMIT,
+                    ),
+                    value: entry.key,
+                    ...(length === undefined ? {} : { description: length }),
+                };
+            }),
+        );
+}
+
+/**
+ * The controls, top to bottom: what is pressed all the time, then the switches,
+ * which are green while on, then the two menus. A row holds five buttons at
+ * most, and a menu takes a row to itself.
+ */
+function addControls(
+    container: ContainerBuilder,
+    queue: ServerQueue | undefined,
+    settings: PanelSettings,
     variant: PanelVariant,
-): APIMessageTopLevelComponent[] {
-    const queue = guild.queue;
+    __: Translate,
+    __mf: TranslateWith,
+): void {
     // With nothing queued there is nothing for a control to act on. Only a
     // request channel shows a panel in that state, and there a request is typed.
     const idle = !queue || queue.songs.size === 0;
-    const __ = i18n__(client, guild);
 
     const button = (id: string, emoji: string, style: ButtonStyle): ButtonBuilder =>
         new ButtonBuilder().setCustomId(id).setEmoji(emoji).setStyle(style).setDisabled(idle);
     const toggle = (on: boolean): ButtonStyle => (on ? ButtonStyle.Success : ButtonStyle.Secondary);
-    const row = (...buttons: ButtonBuilder[]): APIMessageTopLevelComponent =>
-        new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(buttons)
-            .toJSON() as APIMessageTopLevelComponent;
 
-    const transport = row(
+    const transport = [
         button(PanelId.Previous, "⏮️", ButtonStyle.Primary),
         button(PanelId.PauseResume, queue?.playing === true ? "⏸️" : "▶️", ButtonStyle.Primary),
         button(PanelId.Skip, "⏭️", ButtonStyle.Primary),
         button(PanelId.Stop, "⏹️", ButtonStyle.Danger),
-        button(PanelId.Queue, "📋", ButtonStyle.Secondary),
-    );
-
-    const modes = row(
-        button(
-            PanelId.Loop,
-            queue?.loopMode === "SONG" ? "🔂" : "🔁",
-            toggle(queue !== undefined && queue.loopMode !== "OFF"),
-        ),
-        button(PanelId.Shuffle, "🔀", toggle(queue?.shuffle === true)),
-        button(PanelId.AutoPlay, "♾️", toggle(queue?.autoPlay === true)),
-        button(PanelId.VolumeDown, "🔉", ButtonStyle.Secondary),
-        button(PanelId.VolumeUp, "🔊", ButtonStyle.Secondary),
-    );
-
-    const extras = [
-        button(PanelId.SeekBack, "⏪", ButtonStyle.Secondary),
-        button(PanelId.SeekForward, "⏩", ButtonStyle.Secondary),
-        button(PanelId.Remove, "🗑️", ButtonStyle.Danger),
-        button(PanelId.Lyrics, "📜", ButtonStyle.Secondary),
     ];
     if (variant === "compact") {
         // A request channel takes requests as plain messages; elsewhere this
         // button is the way to queue a track without leaving the panel.
-        extras.push(button(PanelId.Add, "➕", ButtonStyle.Success).setDisabled(false));
+        transport.push(button(PanelId.Add, "➕", ButtonStyle.Success).setDisabled(false));
     }
 
-    const components = [transport, modes, row(...extras)];
+    const switches = [
+        button(
+            PanelId.Loop,
+            settings.loopMode === "SONG" ? "🔂" : "🔁",
+            toggle(settings.loopMode !== "OFF"),
+        ),
+        button(PanelId.Shuffle, "🔀", toggle(settings.shuffle)),
+        button(PanelId.AutoPlay, "♾️", toggle(settings.autoPlay)),
+        button(PanelId.Queue, "📋", ButtonStyle.Secondary),
+        button(PanelId.Lyrics, "📜", ButtonStyle.Secondary),
+    ];
 
-    const upcoming = queue?.upcoming() ?? [];
-    if (queue !== undefined && upcoming.length > 0) {
-        const positions = new Map(queue.listed().map((entry, index) => [entry.key, index + 1]));
-        const menu = new StringSelectMenuBuilder()
-            .setCustomId(PanelId.Jump)
-            .setPlaceholder(truncate(__("requestChannel.jumpPlaceholder"), PLACEHOLDER_LIMIT))
-            .addOptions(
-                upcoming.slice(0, JUMP_MENU_SIZE).map((entry) => {
-                    const length =
-                        entry.song.isLive === true
-                            ? __("requestChannel.live")
-                            : entry.song.duration > 0
-                              ? normalizeTime(entry.song.duration)
-                              : undefined;
+    container.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(transport),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(switches),
+    );
 
-                    return {
-                        label: truncate(
-                            `${positions.get(entry.key) ?? "?"}. ${entry.song.title}`,
-                            OPTION_TEXT_LIMIT,
-                        ),
-                        value: entry.key,
-                        ...(length === undefined ? {} : { description: length }),
-                    };
-                }),
-            );
-
-        components.push(
-            new ActionRowBuilder<StringSelectMenuBuilder>()
-                .addComponents(menu)
-                .toJSON() as APIMessageTopLevelComponent,
-        );
+    if (idle) {
+        return;
     }
 
-    return components;
+    const menus = [buildMoreMenu(__, __mf)];
+    const upcoming = queue.upcoming();
+    if (upcoming.length > 0) {
+        menus.push(buildJumpMenu(queue, upcoming, __));
+    }
+
+    container.addActionRowComponents(
+        menus.map((menu) => new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)),
+    );
 }
 
+/**
+ * Build the panel for a guild as it is right now. Without `controls` it only
+ * reports: that is for a place where the controls are already on screen.
+ */
 export function buildPlayerPanel(
     client: Rawon,
     guild: Guild,
     variant: PanelVariant,
-): { embeds: EmbedBuilder[]; components: APIMessageTopLevelComponent[] } {
+    controls = true,
+): PlayerPanel {
+    const queue = guild.queue;
+    const bs = client.data.botSettings;
+    const __ = i18n__(client, guild);
+    const __mf = i18n__mf(client, guild);
+    const settings = readSettings(client, guild);
+
+    // A track removed as the last of the queue is still held for a moment, so
+    // it is the empty queue that says nothing is playing. Between two tracks
+    // the player holds nothing; show the one about to start.
+    const idle = !queue || queue.songs.size === 0;
+    const entry = idle ? undefined : (queue.currentSong ?? queue.songs.sortByIndex().first());
+    const artwork = embedThumbnail(entry?.song.thumbnail);
+
+    const container = new ContainerBuilder().setAccentColor(
+        resolveColor(bs.embedColor as ColorResolvable),
+    );
+    const text = new TextDisplayBuilder().setContent(
+        describePlayer(queue, entry, settings, variant, __, __mf),
+    );
+
+    // The full panel has the artwork across its width, which leaves the corner
+    // for the server's icon. A section cannot go without something in its corner.
+    const corner = variant === "full" ? guild.iconURL({ size: 256 }) : artwork;
+    if (corner !== null && corner.length > 0) {
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(text)
+                .setThumbnailAccessory(new ThumbnailBuilder().setURL(corner)),
+        );
+    } else {
+        container.addTextDisplayComponents(text);
+    }
+
+    if (variant === "full") {
+        // No splash is configured out of the box.
+        const banner =
+            artwork ?? (bs.requestChannelSplash.length > 0 ? bs.requestChannelSplash : null);
+        if (banner !== null) {
+            container.addMediaGalleryComponents(
+                new MediaGalleryBuilder().addItems({ media: { url: banner } }),
+            );
+        }
+    }
+
+    if (controls) {
+        container.addSeparatorComponents(new SeparatorBuilder());
+        addControls(container, queue, settings, variant, __, __mf);
+    }
+
     return {
-        embeds: [buildPlayerEmbed(client, guild, variant)],
-        components: buildPlayerComponents(client, guild, variant),
+        components: [container],
+        // In an embed a mention is only a name. Here it would notify the
+        // requester every time the panel is posted.
+        allowedMentions: { parse: [], repliedUser: false },
     };
 }

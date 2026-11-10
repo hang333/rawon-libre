@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "음악 플레이어",
         "standby": "재생 중인 음악이 없어요. 노래 이름이나 URL을 보내서 재생을 시작하세요!",
-        "status": "반복 모드",
-        "shuffle": "셔플",
         "autoplay": "자동재생",
         "volume": "볼륨",
         "queueFooter": "대기열에 남은 곡: {count}개 ({duration} 길이, 자동 재생: {state})",
@@ -449,7 +447,11 @@
         "upNext": "다음 곡",
         "jumpPlaceholder": "대기열의 노래로 건너뛰기",
         "addModalTitle": "대기열에 추가",
-        "addModalLabel": "노래 제목 또는 URL"
+        "addModalLabel": "노래 제목 또는 URL",
+        "morePlaceholder": "추가 작업",
+        "seekBack": "{seconds}초 뒤로",
+        "seekForward": "{seconds}초 앞으로",
+        "removeCurrent": "현재 노래 삭제"
     },
     "reusable": {
         "invalidUsage": "잘못된 사용법이에요. {prefix} {name}으로 자세한 정보를 확인하세요.",

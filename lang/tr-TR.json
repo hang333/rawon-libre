@@ -422,8 +422,6 @@
     "requestChannel": {
         "title": "Müzik Çalar",
         "standby": "Müzik çalmıyor. Başlamak için şarkı adı veya URL gönderin!",
-        "status": "Döngü Modu",
-        "shuffle": "Karıştır",
         "autoplay": "Otomatik oynatma",
         "volume": "Ses Seviyesi",
         "queueFooter": "Kuyrukta kalan parça sayısı: {count} ({duration} süre, otomatik oynatma: {state})",
@@ -448,7 +446,11 @@
         "upNext": "Sıradaki",
         "jumpPlaceholder": "Kuyruktaki bir şarkıya atla",
         "addModalTitle": "Kuyruğa ekle",
-        "addModalLabel": "Şarkı adı veya URL"
+        "addModalLabel": "Şarkı adı veya URL",
+        "morePlaceholder": "Diğer işlemler",
+        "seekBack": "{seconds} saniye geri",
+        "seekForward": "{seconds} saniye ileri",
+        "removeCurrent": "Mevcut şarkıyı kaldır"
     },
     "reusable": {
         "invalidUsage": "Geçersiz kullanım, lütfen daha fazla bilgi için {prefix} {name} kullanın.",

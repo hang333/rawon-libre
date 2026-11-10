@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Reproductor de Música",
         "standby": "No hay música reproduciéndose. ¡Envía un nombre de canción o URL para empezar!",
-        "status": "Modo de Bucle",
-        "shuffle": "Aleatorio",
         "autoplay": "Reproducción automática",
         "volume": "Volumen",
         "queueFooter": "Canciones restantes en la cola: {count} ({duration} de duración, reproducción automática: {state})",
@@ -449,7 +447,11 @@
         "upNext": "A continuación",
         "jumpPlaceholder": "Saltar a una canción de la cola",
         "addModalTitle": "Añadir a la cola",
-        "addModalLabel": "Nombre de la canción o URL"
+        "addModalLabel": "Nombre de la canción o URL",
+        "morePlaceholder": "Más acciones",
+        "seekBack": "Retroceder {seconds} segundos",
+        "seekForward": "Avanzar {seconds} segundos",
+        "removeCurrent": "Quitar la canción actual"
     },
     "reusable": {
         "invalidUsage": "Uso inválido, por favor usa {prefix} {name} para más información.",

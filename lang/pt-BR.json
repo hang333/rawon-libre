@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Reprodutor de Música",
         "standby": "Nenhuma música tocando. Envie um nome de música ou URL para começar!",
-        "status": "Modo Loop",
-        "shuffle": "Aleatório",
         "autoplay": "Reprodução automática",
         "volume": "Volume",
         "queueFooter": "Faixas restantes na fila: {count} ({duration} de duração, reprodução automática: {state})",
@@ -449,7 +447,11 @@
         "upNext": "A seguir",
         "jumpPlaceholder": "Pular para uma música da fila",
         "addModalTitle": "Adicionar à fila",
-        "addModalLabel": "Nome da música ou URL"
+        "addModalLabel": "Nome da música ou URL",
+        "morePlaceholder": "Mais ações",
+        "seekBack": "Voltar {seconds} segundos",
+        "seekForward": "Avançar {seconds} segundos",
+        "removeCurrent": "Remover a música atual"
     },
     "reusable": {
         "invalidUsage": "Uso inválido, por favor use {prefix} {name} para mais informações.",

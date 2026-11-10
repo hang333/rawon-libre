@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Trình phát nhạc",
         "standby": "Không có nhạc đang phát. Gửi tên bài hát hoặc URL để bắt đầu!",
-        "status": "Chế độ lặp",
-        "shuffle": "Trộn",
         "autoplay": "Tự động phát",
         "volume": "Âm lượng",
         "queueFooter": "Bài hát còn lại trong hàng đợi: {count} ({duration} thời lượng, phát tự động: {state})",
@@ -449,7 +447,11 @@
         "upNext": "Tiếp theo",
         "jumpPlaceholder": "Chuyển tới một bài hát trong hàng đợi",
         "addModalTitle": "Thêm vào hàng đợi",
-        "addModalLabel": "Tên bài hát hoặc URL"
+        "addModalLabel": "Tên bài hát hoặc URL",
+        "morePlaceholder": "Thao tác khác",
+        "seekBack": "Lùi {seconds} giây",
+        "seekForward": "Tua tới {seconds} giây",
+        "removeCurrent": "Xóa bài hát hiện tại"
     },
     "reusable": {
         "invalidUsage": "Cách sử dụng không hợp lệ, vui lòng nhập {prefix} {name} để biết thêm thông tin.",

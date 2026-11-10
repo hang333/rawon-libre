@@ -60,13 +60,13 @@ Each command is available as a slash command and with the prefix, whichever of t
 | `stop`, `leave` | Empty the queue and leave the voice channel |
 | `nowplaying` | Bring the player panel to the channel you are in |
 
-The **player panel** carries the same controls as buttons. The bot posts it when a track starts, and
-a request channel shows a permanent one.
+The **player panel** carries the same controls, in one card with the track that is playing. The bot
+posts it when a track starts, and a request channel shows a permanent one.
 
-- ⏮️ ⏯️ ⏭️ ⏹️ 📋 — previous, pause or resume, skip, stop, show the queue
-- 🔁 🔀 ♾️ 🔉 🔊 — repeat mode, shuffle, auto-play, volume down and up
-- ⏪ ⏩ 🗑️ 📜 ➕ — back and forward ten seconds, remove the current track, lyrics, add a track
-- A menu under the buttons jumps straight to any of the next 25 tracks
+- ⏮️ ⏯️ ⏭️ ⏹️ ➕ — previous, pause or resume, skip, stop, add a track
+- 🔁 🔀 ♾️ 📋 📜 — repeat mode, shuffle and auto-play, green while on; show the queue; lyrics
+- A "more actions" menu — back and forward ten seconds, set the volume, remove the current track
+- A second menu jumps straight to any of the next 25 tracks
 
 The panel stays in place while nothing is posted under it and is re-posted at the bottom of the
 channel once the conversation has moved on. Its buttons work for anyone in the bot's voice channel

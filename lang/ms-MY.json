@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Pemain Muzik",
         "standby": "Tiada muzik dimainkan. Hantar tajuk lagu atau pautan untuk mula dengar muzik!",
-        "status": "Mod ulangan",
-        "shuffle": "Acak",
         "autoplay": "Main automatik",
         "volume": "Kelantangan",
         "queueFooter": "Lagu berbaki dalam giliran: {count} ({duration} tempoh, main automatik: {state})",
@@ -449,7 +447,11 @@
         "upNext": "Seterusnya",
         "jumpPlaceholder": "Langkau ke lagu dalam giliran",
         "addModalTitle": "Tambah ke giliran",
-        "addModalLabel": "Nama lagu atau URL"
+        "addModalLabel": "Nama lagu atau URL",
+        "morePlaceholder": "Tindakan lain",
+        "seekBack": "Undur {seconds} saat",
+        "seekForward": "Maju {seconds} saat",
+        "removeCurrent": "Padam lagu semasa"
     },
     "reusable": {
         "invalidUsage": "Penggunaan tidak sah, sila gunakan {prefix} {name} untuk maklumat lanjut.",

@@ -1,8 +1,6 @@
 import { clearTimeout, setTimeout } from "node:timers";
 import {
-    type APIMessageTopLevelComponent,
     ChannelType,
-    type EmbedBuilder,
     type Guild,
     type Message,
     MessageFlags,
@@ -14,7 +12,7 @@ import {
 import { type Rawon } from "../../structures/Rawon.js";
 import { createEmbed } from "../functions/createEmbed.js";
 import { i18n__, i18n__mf } from "../functions/i18n.js";
-import { buildPlayerComponents, buildPlayerEmbed, PanelId } from "../functions/playerPanel.js";
+import { buildPlayerPanel, PanelId } from "../functions/playerPanel.js";
 import {
     type FallbackDataManager,
     hasGetRequestChannel,
@@ -352,25 +350,45 @@ export class RequestChannelManager {
         }
     }
 
-    public createPlayerEmbed(guild: Guild): EmbedBuilder {
-        return buildPlayerEmbed(this.client, guild, "full");
-    }
+    /**
+     * Draw the player onto `message`, or as a new message when there is none.
+     * Returns the message that now holds it.
+     */
+    private async drawPlayer(
+        guild: Guild,
+        channel: TextChannel | VoiceChannel | StageChannel,
+        message: Message | null,
+    ): Promise<Message> {
+        const panel = buildPlayerPanel(this.client, guild, "full");
+        if (message?.flags.has(MessageFlags.IsComponentsV2) === true) {
+            return message.edit(panel);
+        }
 
-    public createPlayerButtons(guild: Guild): APIMessageTopLevelComponent[] {
-        return buildPlayerComponents(this.client, guild, "full");
+        const fresh = await channel.send({
+            ...panel,
+            flags: [MessageFlags.IsComponentsV2, MessageFlags.SuppressNotifications],
+        });
+
+        // A player from before it was laid out as components is an embed with
+        // buttons under it, and is replaced rather than converted. The new one
+        // is recorded first: deleting the recorded player message is taken to
+        // mean that the request channel is no longer wanted.
+        await this.setPlayerMessageId(guild, fresh.id);
+        await message?.delete().catch(() => null);
+
+        return fresh;
     }
 
     private hasPlayerControls(message: Message): boolean {
-        return message.components.some((row) => {
-            if (!("components" in row) || !Array.isArray(row.components)) {
-                return false;
-            }
+        // A panel keeps its rows of controls inside a container; the embed
+        // player that came before it had them at the top level.
+        const holdsControls = (component: object): boolean =>
+            ("customId" in component && component.customId === PanelId.PauseResume) ||
+            ("components" in component &&
+                Array.isArray(component.components) &&
+                component.components.some(holdsControls));
 
-            return row.components.some(
-                (component) =>
-                    "customId" in component && component.customId === PanelId.PauseResume,
-            );
-        });
+        return message.components.some(holdsControls);
     }
 
     private async findPlayerMessages(
@@ -520,13 +538,8 @@ export class RequestChannelManager {
                     return;
                 }
 
-                const embed = this.createPlayerEmbed(guild);
-                const components = this.createPlayerButtons(guild);
                 try {
-                    await message.edit({
-                        embeds: [embed],
-                        components,
-                    });
+                    await this.drawPlayer(guild, channel, message);
                 } catch (error) {
                     if (this.isPermissionError(error)) {
                         const __ = i18n__(this.client, guild);
@@ -623,25 +636,14 @@ export class RequestChannelManager {
         }
 
         const trackedMessage = await this.getPlayerMessage(guild).catch(() => null);
-        let message = await this.pruneDuplicatePlayerMessages(guild, channel, trackedMessage);
+        const message = await this.pruneDuplicatePlayerMessages(guild, channel, trackedMessage);
+
+        if (!message && !allowCreate) {
+            return null;
+        }
 
         try {
-            if (message) {
-                await message.edit({
-                    embeds: [this.createPlayerEmbed(guild)],
-                    components: this.createPlayerButtons(guild),
-                });
-            } else if (allowCreate) {
-                message = await channel.send({
-                    flags: MessageFlags.SuppressNotifications,
-                    embeds: [this.createPlayerEmbed(guild)],
-                    components: this.createPlayerButtons(guild),
-                });
-                await this.setPlayerMessageId(guild, message.id);
-            } else {
-                return null;
-            }
-            return message;
+            return await this.drawPlayer(guild, channel, message);
         } catch (error) {
             if (this.isPermissionError(error)) {
                 const __ = i18n__(this.client, guild);

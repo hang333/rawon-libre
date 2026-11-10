@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Музыкальный плеер",
         "standby": "Музыка не воспроизводится. Отправьте название песни или URL чтобы начать!",
-        "status": "Режим повтора",
-        "shuffle": "Перемешать",
         "autoplay": "Автовоспроизведение",
         "volume": "Громкость",
         "queueFooter": "Осталось треков в очереди: {count} ({duration} длительности, автовоспроизведение: {state})",
@@ -449,7 +447,11 @@
         "upNext": "Далее",
         "jumpPlaceholder": "Перейти к песне из очереди",
         "addModalTitle": "Добавить в очередь",
-        "addModalLabel": "Название песни или URL"
+        "addModalLabel": "Название песни или URL",
+        "morePlaceholder": "Другие действия",
+        "seekBack": "Назад на {seconds} секунд",
+        "seekForward": "Вперёд на {seconds} секунд",
+        "removeCurrent": "Удалить текущую песню"
     },
     "reusable": {
         "invalidUsage": "Неверное использование, пожалуйста используйте {prefix} {name} для большей информации.",

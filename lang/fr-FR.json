@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Lecteur de Musique",
         "standby": "Pas de musique en cours. Envoyez un nom de chanson ou une URL pour commencer !",
-        "status": "Mode Boucle",
-        "shuffle": "Aléatoire",
         "autoplay": "Lecture automatique",
         "volume": "Volume",
         "queueFooter": "Pistes restantes dans la file d'attente : {count} ({duration} de durée, lecture automatique : {state})",
@@ -449,7 +447,11 @@
         "upNext": "À suivre",
         "jumpPlaceholder": "Aller à un morceau de la file d'attente",
         "addModalTitle": "Ajouter à la file d'attente",
-        "addModalLabel": "Titre du morceau ou URL"
+        "addModalLabel": "Titre du morceau ou URL",
+        "morePlaceholder": "Plus d'actions",
+        "seekBack": "Reculer de {seconds} secondes",
+        "seekForward": "Avancer de {seconds} secondes",
+        "removeCurrent": "Retirer le morceau en cours"
     },
     "reusable": {
         "invalidUsage": "Usage invalide, veuillez utiliser {prefix} {name} pour plus d'informations.",

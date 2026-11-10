@@ -464,8 +464,6 @@
     "requestChannel": {
         "title": "音乐播放器",
         "standby": "没有音乐播放中。发送歌曲名称或URL开始播放！",
-        "status": "循环模式",
-        "shuffle": "随机播放",
         "autoplay": "自动播放",
         "volume": "音量",
         "queueFooter": "队列中剩余曲目：{count}（{duration} 时长, 自动播放：{state}）",
@@ -490,7 +488,11 @@
         "upNext": "下一首",
         "jumpPlaceholder": "跳转到队列中的歌曲",
         "addModalTitle": "添加到队列",
-        "addModalLabel": "歌曲名称或链接"
+        "addModalLabel": "歌曲名称或链接",
+        "morePlaceholder": "更多操作",
+        "seekBack": "后退 {seconds} 秒",
+        "seekForward": "快进 {seconds} 秒",
+        "removeCurrent": "移除当前歌曲"
     },
     "reusable": {
         "invalidUsage": "无效的用法，请用 {prefix} {name}了解更多资讯。",

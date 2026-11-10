@@ -464,8 +464,6 @@
     "requestChannel": {
         "title": "Music Player",
         "standby": "No music playing. Send a song name or URL to start playing!",
-        "status": "Loop Mode",
-        "shuffle": "Shuffle",
         "autoplay": "Auto-play",
         "volume": "Volume",
         "queueFooter": "Remaining tracks in queue: {count} ({duration} duration, auto-play: {state})",
@@ -490,7 +488,11 @@
         "upNext": "Up next",
         "jumpPlaceholder": "Jump to a track in the queue",
         "addModalTitle": "Add to queue",
-        "addModalLabel": "Song name or URL"
+        "addModalLabel": "Song name or URL",
+        "morePlaceholder": "More actions",
+        "seekBack": "Back {seconds} seconds",
+        "seekForward": "Forward {seconds} seconds",
+        "removeCurrent": "Remove the current track"
     },
     "reusable": {
         "invalidUsage": "Invalid usage. Please use {prefix} {name} for more information.",

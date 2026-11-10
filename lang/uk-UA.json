@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "Музичний плеєр",
         "standby": "Музика не грає. Надішліть назву пісні або URL щоб почати!",
-        "status": "Режим повтору",
-        "shuffle": "Перемішати",
         "autoplay": "Автовідтворення",
         "volume": "Гучність",
         "queueFooter": "Залишилося треків у черзі: {count} ({duration} тривалості, автовідтворення: {state})",
@@ -449,7 +447,11 @@
         "upNext": "Далі",
         "jumpPlaceholder": "Перейти до пісні з черги",
         "addModalTitle": "Додати до черги",
-        "addModalLabel": "Назва пісні або URL"
+        "addModalLabel": "Назва пісні або URL",
+        "morePlaceholder": "Інші дії",
+        "seekBack": "Назад на {seconds} секунд",
+        "seekForward": "Вперед на {seconds} секунд",
+        "removeCurrent": "Вилучити поточну пісню"
     },
     "reusable": {
         "invalidUsage": "Некоректне використання, будь ласка, скористайтесь {prefix} {name} для отримання інформації.",

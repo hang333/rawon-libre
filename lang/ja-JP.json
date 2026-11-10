@@ -423,8 +423,6 @@
     "requestChannel": {
         "title": "ミュージックプレーヤー",
         "standby": "音楽は再生されていません。曲名またはURLを送信して再生を開始してください！",
-        "status": "ループモード",
-        "shuffle": "シャッフル",
         "autoplay": "自動再生",
         "volume": "音量",
         "queueFooter": "キュー内の残り曲数: {count}（{duration}, 自動再生: {state}）",
@@ -449,7 +447,11 @@
         "upNext": "次の曲",
         "jumpPlaceholder": "キュー内の曲へジャンプ",
         "addModalTitle": "キューに追加",
-        "addModalLabel": "曲名または URL"
+        "addModalLabel": "曲名または URL",
+        "morePlaceholder": "その他の操作",
+        "seekBack": "{seconds}秒戻る",
+        "seekForward": "{seconds}秒進む",
+        "removeCurrent": "現在の曲を削除"
     },
     "reusable": {
         "invalidUsage": "無効な使用方法です。{prefix} {name}を実行して情報を照会してください。",

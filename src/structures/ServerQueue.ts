@@ -967,8 +967,8 @@ export class ServerQueue {
         void (async () => {
             try {
                 const message = await this.textChannel.send({
-                    flags: MessageFlags.SuppressNotifications,
                     ...buildPlayerPanel(this.client, this.textChannel.guild, "compact"),
+                    flags: [MessageFlags.IsComponentsV2, MessageFlags.SuppressNotifications],
                 });
 
                 // The track may have ended, or the queue been destroyed, while the
@@ -1028,6 +1028,17 @@ export class ServerQueue {
         if (this.client.requestChannelManager.isRequestChannel(guild, panel.channelId)) {
             this._panel = null;
             this._panelSongKey = null;
+            return;
+        }
+
+        // A panel from before panels were laid out as components is an embed
+        // with buttons under it. It is replaced rather than converted: that
+        // happens once, and a new message is certain to come out right.
+        if (!panel.flags.has(MessageFlags.IsComponentsV2)) {
+            this._panel = null;
+            this._panelSongKey = null;
+            await panel.delete().catch(() => null);
+            this.showNowPlayingPanel(current);
             return;
         }
 

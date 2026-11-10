@@ -5,13 +5,14 @@ import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import {
     BaseInteraction,
     type CommandInteraction,
+    MessageFlags,
     PermissionFlagsBits,
     type SlashCommandBuilder,
 } from "discord.js";
 import i18n from "../../config/index.js";
 import { type Rawon } from "../../structures/Rawon.js";
 import { haveQueue } from "../../utils/decorators/MusicUtil.js";
-import { buildPlayerEmbed, buildPlayerPanel } from "../../utils/functions/playerPanel.js";
+import { buildPlayerPanel } from "../../utils/functions/playerPanel.js";
 
 @ApplyOptions<Command.Options>({
     name: "nowplaying",
@@ -51,13 +52,19 @@ export class NowPlayingCommand extends ContextCommand {
         // A server with a request channel already has its player there, with the
         // controls; here the status alone is enough.
         if (client.requestChannelManager.hasRequestChannel(guild)) {
-            await ctx.reply({ embeds: [buildPlayerEmbed(client, guild, "compact")] });
+            await ctx.reply({
+                ...buildPlayerPanel(client, guild, "compact", false),
+                flags: MessageFlags.IsComponentsV2,
+            });
             return;
         }
 
         // Everywhere else this brings the player panel to wherever it was asked
         // for: the reply becomes the queue's panel, and the old one is removed.
-        const reply = await ctx.reply(buildPlayerPanel(client, guild, "compact"));
+        const reply = await ctx.reply({
+            ...buildPlayerPanel(client, guild, "compact"),
+            flags: MessageFlags.IsComponentsV2,
+        });
         const current = queue.currentSong;
         if (current === undefined) {
             return;

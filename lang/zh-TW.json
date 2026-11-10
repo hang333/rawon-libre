@@ -464,8 +464,6 @@
     "requestChannel": {
         "title": "音樂播放器",
         "standby": "沒有音樂播放中。發送歌曲名稱或URL開始播放！",
-        "status": "循環模式",
-        "shuffle": "隨機播放",
         "autoplay": "自動播放",
         "volume": "音量",
         "queueFooter": "佇列中剩餘曲目：{count}（{duration} 時長, 自動播放：{state}）",
@@ -490,7 +488,11 @@
         "upNext": "下一首",
         "jumpPlaceholder": "跳轉到佇列中的歌曲",
         "addModalTitle": "添加到佇列",
-        "addModalLabel": "歌曲名稱或連結"
+        "addModalLabel": "歌曲名稱或連結",
+        "morePlaceholder": "更多操作",
+        "seekBack": "倒退 {seconds} 秒",
+        "seekForward": "快轉 {seconds} 秒",
+        "removeCurrent": "移除當前歌曲"
     },
     "reusable": {
         "invalidUsage": "無效的用法，請用 {prefix} {name}了解更多資訊。",

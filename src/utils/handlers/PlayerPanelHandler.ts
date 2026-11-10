@@ -28,10 +28,16 @@ import { chunk } from "../functions/chunk.js";
 import { createEmbed } from "../functions/createEmbed.js";
 import { formatMarkdownLink } from "../functions/formatMarkdownLink.js";
 import { i18n__, i18n__mf } from "../functions/i18n.js";
-import { canOverrideTrack, hasDjPrivilege, isQueueLocked } from "../functions/musicPermissions.js";
+import { canOverrideTrack, isQueueLocked } from "../functions/musicPermissions.js";
 import { parseHTMLElements } from "../functions/parseHTMLElements.js";
 import { seekFeedback, stepBackFeedback } from "../functions/playerFeedback.js";
-import { PANEL_PREFIX, PanelId, truncate } from "../functions/playerPanel.js";
+import {
+    PANEL_PREFIX,
+    PanelId,
+    SEEK_STEP_SECONDS,
+    truncate,
+    VOLUME_PRESETS,
+} from "../functions/playerPanel.js";
 import { embedThumbnail } from "../functions/thumbnails.js";
 import { play } from "./general/play.js";
 
@@ -39,6 +45,9 @@ export type PanelInteraction =
     | ButtonInteraction
     | ModalSubmitInteraction
     | StringSelectMenuInteraction;
+
+/** A control on the panel itself: a button, or an option of the "more" menu. */
+type ControlInteraction = ButtonInteraction | StringSelectMenuInteraction;
 
 type Panel = {
     client: Rawon;
@@ -51,11 +60,6 @@ type Panel = {
 /** How long the private answer to a button press stays before it is cleared. */
 const REPLY_LIFETIME_MS = 60_000;
 const PAGER_LIFETIME_MS = 120_000;
-const VOLUME_STEP = 10;
-const SEEK_STEP_SECONDS = 10;
-/** Raising the volume past this takes DJ privilege, as it does for `volume`. */
-const OPEN_VOLUME_LIMIT = 100;
-const VOLUME_LIMIT = 200;
 /** Discord's limits on a modal's title and on the label of one of its fields. */
 const MODAL_TEXT_LIMIT = 45;
 const ADD_QUERY_FIELD = "query";
@@ -176,26 +180,31 @@ export async function handlePlayerPanelInteraction(interaction: PanelInteraction
     } else if (!queue || queue.songs.size === 0) {
         await respond(interaction, createEmbed("warn", __("requestChannel.nothingPlaying")));
         return;
-    } else if (interaction.isStringSelectMenu()) {
-        if (interaction.customId === PanelId.Jump) {
+    } else if (interaction.customId === PanelId.Jump) {
+        if (interaction.isStringSelectMenu()) {
             await jumpTo(panel, interaction, queue);
         }
     } else {
-        await pressButton(panel, interaction, queue);
+        // A button is its own action; the "more" menu names one in the option picked.
+        const action = interaction.isStringSelectMenu()
+            ? (interaction.values[0] ?? "")
+            : interaction.customId;
+        await useControl(panel, interaction, queue, action);
     }
 
     await client.requestChannelManager.updatePlayerMessage(guild);
     await reconcilePanel(client, guild, interaction.message);
 }
 
-async function pressButton(
+async function useControl(
     panel: Panel,
-    interaction: ButtonInteraction,
+    interaction: ControlInteraction,
     queue: ServerQueue,
+    action: string,
 ): Promise<void> {
     const { client, guild, member, __, __mf } = panel;
 
-    switch (interaction.customId) {
+    switch (action) {
         case PanelId.PauseResume: {
             const pausing = queue.playing;
             queue.playing = !pausing;
@@ -275,16 +284,9 @@ async function pressButton(
             break;
         }
 
-        case PanelId.VolumeDown:
-        case PanelId.VolumeUp: {
-            await changeVolume(panel, interaction, queue);
-            break;
-        }
-
         case PanelId.SeekBack:
         case PanelId.SeekForward: {
-            const step =
-                interaction.customId === PanelId.SeekBack ? -SEEK_STEP_SECONDS : SEEK_STEP_SECONDS;
+            const step = action === PanelId.SeekBack ? -SEEK_STEP_SECONDS : SEEK_STEP_SECONDS;
             const song = queue.currentSong;
             const result = queue.seek(Math.max(0, queue.position + step));
 
@@ -297,14 +299,35 @@ async function pressButton(
             break;
         }
 
-        default:
-            break;
+        default: {
+            const volume = action.startsWith(PanelId.Volume)
+                ? Number(action.slice(PanelId.Volume.length))
+                : Number.NaN;
+
+            if (VOLUME_PRESETS.includes(volume)) {
+                queue.volume = volume;
+                await respond(
+                    interaction,
+                    createEmbed(
+                        "success",
+                        `🔊 **|** ${__mf("commands.music.volume.newVolume", {
+                            volume: `**\`${volume}%\`**`,
+                        })}`,
+                    ),
+                );
+                break;
+            }
+
+            // A control that no longer exists, on a panel an earlier version
+            // posted. Take the press; the panel is redrawn right after this.
+            await interaction.deferUpdate().catch(() => null);
+        }
     }
 }
 
 async function skipTrack(
     panel: Panel,
-    interaction: ButtonInteraction,
+    interaction: ControlInteraction,
     queue: ServerQueue,
 ): Promise<void> {
     const { client, guild, member, __, __mf } = panel;
@@ -348,7 +371,7 @@ async function skipTrack(
 /** Cast or withdraw a vote. True once enough listeners want the track gone. */
 async function voteToSkip(
     panel: Panel,
-    interaction: ButtonInteraction,
+    interaction: ControlInteraction,
     queue: ServerQueue,
     member: GuildMember,
 ): Promise<boolean> {
@@ -399,46 +422,9 @@ async function stopPlayer(
     );
 }
 
-async function changeVolume(
-    panel: Panel,
-    interaction: ButtonInteraction,
-    queue: ServerQueue,
-): Promise<void> {
-    const { client, guild, member, __, __mf } = panel;
-    let volume = Math.max(1, queue.volume - VOLUME_STEP);
-
-    if (interaction.customId === PanelId.VolumeUp) {
-        const privileged = await hasDjPrivilege(client, guild, member);
-        volume = Math.min(
-            queue.volume + VOLUME_STEP,
-            // Never lower a volume that a DJ has already set above the open limit.
-            Math.max(queue.volume, privileged ? VOLUME_LIMIT : OPEN_VOLUME_LIMIT),
-        );
-
-        if (volume === queue.volume && !privileged) {
-            await respond(
-                interaction,
-                createEmbed("error", __("commands.music.volume.noPermission"), true),
-            );
-            return;
-        }
-    }
-
-    queue.volume = volume;
-    await respond(
-        interaction,
-        createEmbed(
-            "success",
-            `🔊 **|** ${__mf("commands.music.volume.newVolume", {
-                volume: `**\`${volume}%\`**`,
-            })}`,
-        ),
-    );
-}
-
 async function removeCurrent(
     panel: Panel,
-    interaction: ButtonInteraction,
+    interaction: ControlInteraction,
     queue: ServerQueue,
 ): Promise<void> {
     const { client, guild, member, __, __mf } = panel;
