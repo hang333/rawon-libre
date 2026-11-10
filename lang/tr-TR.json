@@ -207,7 +207,6 @@
                 "filterRestartedFooter": "Şarkı baştan başlatıldı (ses hala yükleniyordu).",
                 "filterNoQueueFooter": "Müzik çalmaya başladığınızda filtre uygulanacak.",
                 "slashStateDescription": "Şarkı filtresi {state, select, enable {Enable} other {Disable}} olacaktır",
-                "slashStateFilterDescription": "",
                 "slashStatusDescription": "Şarkı filtrelerinin mevcut durumunu kontrol edin",
                 "slashStatusFilterDescription": "Kontrol etmek istediğiniz şarkı filtresi",
                 "specifyFilter": "Lütfen şarkı filtresini belirtin."
