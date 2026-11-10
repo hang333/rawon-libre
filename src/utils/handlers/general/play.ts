@@ -1,4 +1,3 @@
-import { type Buffer } from "node:buffer";
 import fs, { promises as fsp } from "node:fs";
 import os from "node:os";
 import nodePath from "node:path";
@@ -11,7 +10,6 @@ import {
     VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { ChannelType, type Guild, MessageFlags } from "discord.js";
-import prism from "prism-media";
 import { createEmbed } from "../../functions/createEmbed.js";
 import { ffmpegArgs } from "../../functions/ffmpegArgs.js";
 import {
@@ -21,8 +19,9 @@ import {
 import { formatMarkdownLink } from "../../functions/formatMarkdownLink.js";
 import { getEffectivePrefix } from "../../functions/getEffectivePrefix.js";
 import { i18n__, i18n__mf } from "../../functions/i18n.js";
+import { type FfmpegProcess, spawnFfmpeg } from "../../functions/spawnFfmpeg.js";
 import { embedThumbnail } from "../../functions/thumbnails.js";
-import { type FfmpegStreamWithEvents, isErrnoException } from "../../typeGuards.js";
+import { isErrnoException } from "../../typeGuards.js";
 import {
     AgeRestrictedError,
     AllCookiesFailedError,
@@ -121,8 +120,29 @@ export async function play(
         return;
     }
 
-    let ffmpegStream: prism.FFmpeg;
+    let ffmpeg: FfmpegProcess;
     let ffmpegStderr = "";
+
+    const onStderr = (text: string): void => {
+        ffmpegStderr = (ffmpegStderr + text).slice(-10_000);
+        queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_STERR]", text);
+    };
+    // A failure while decoding a stream ends the track through the player's own
+    // error handling. The audio being closed under ffmpeg, which is what a
+    // skip, a seek and a stop all do, is not a failure.
+    const onDecodeError = (e: unknown): void => {
+        queue.client.logger.error("[PLAY_HANDLER][FFMPEG_ERROR]", e);
+        const isPremature =
+            String(e ?? "").includes("Premature close") ||
+            (isErrnoException(e) && e.code === "ERR_STREAM_PREMATURE_CLOSE");
+        if (isPremature) {
+            queue.client.logger.debug("[PLAY_HANDLER] Ignoring premature-close ffmpeg error", e);
+            return;
+        }
+        try {
+            queue.player.emit("error", new AudioPlayerError(e as Error, undefined as never));
+        } catch (_) {}
+    };
 
     try {
         const streamResult = await getStream(
@@ -141,62 +161,20 @@ export async function play(
         if (streamResult.cachePath) {
             const args = ffmpegArgs(queue.filters, seekSeconds, streamResult.cachePath);
             queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_ARGS]", args.join(" "));
-            ffmpegStream = new prism.FFmpeg({
-                args,
+            ffmpeg = spawnFfmpeg(args, {
+                onStderr,
+                onError: (e) => queue.client.logger.error("[PLAY_HANDLER][FFMPEG_ERROR]", e),
+                onClose: (code) => queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_CLOSE]", code),
             });
-            (ffmpegStream as FfmpegStreamWithEvents).stderr?.on?.("data", (chunk: Buffer) => {
-                const s = chunk.toString();
-                ffmpegStderr += s;
-                queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_STERR]", s);
-            });
-            (ffmpegStream as FfmpegStreamWithEvents).on?.("error", (e: unknown) =>
-                queue.client.logger.error("[PLAY_HANDLER][FFMPEG_ERROR]", e),
-            );
-            (ffmpegStream as FfmpegStreamWithEvents).on?.("close", (code?: unknown) =>
-                queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_CLOSE]", code),
-            );
         } else if (streamResult.stream) {
             if (seekSeconds === 0) {
                 const args = ffmpegArgs(queue.filters, 0);
                 queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_ARGS_STREAM]", args.join(" "));
-                ffmpegStream = new prism.FFmpeg({ args });
-
-                (ffmpegStream as FfmpegStreamWithEvents).stderr?.on?.("data", (chunk: Buffer) => {
-                    const s = chunk.toString();
-                    ffmpegStderr += s;
-                    queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_STERR]", s);
+                ffmpeg = spawnFfmpeg(args, {
+                    input: streamResult.stream,
+                    onStderr,
+                    onError: onDecodeError,
                 });
-
-                (ffmpegStream as FfmpegStreamWithEvents).on?.("error", (e: unknown) => {
-                    queue.client.logger.error("[PLAY_HANDLER][FFMPEG_ERROR]", e);
-                    const errStr = String(e ?? "");
-                    const isPremature =
-                        errStr.includes("Premature close") ||
-                        (isErrnoException(e) && e.code === "ERR_STREAM_PREMATURE_CLOSE");
-                    if (isPremature) {
-                        queue.client.logger.debug(
-                            "[PLAY_HANDLER] Ignoring premature-close ffmpeg error",
-                            e,
-                        );
-                        return;
-                    }
-                    try {
-                        queue.player.emit(
-                            "error",
-                            new AudioPlayerError(e as Error, undefined as never),
-                        );
-                    } catch (_) {}
-                });
-
-                try {
-                    streamResult.stream.pipe(ffmpegStream);
-                } catch (e) {
-                    queue.client.logger.error(
-                        "[PLAY_HANDLER] Failed to pipe stream into ffmpeg:",
-                        e,
-                    );
-                    throw e;
-                }
             } else {
                 const tmpFile = nodePath.join(
                     os.tmpdir(),
@@ -253,39 +231,21 @@ export async function play(
 
                 const args = ffmpegArgs(queue.filters, seekSeconds, tmpFile);
                 queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_ARGS]", args.join(" "));
-                ffmpegStream = new prism.FFmpeg({ args });
-
-                (ffmpegStream as FfmpegStreamWithEvents).stderr?.on?.("data", (chunk: Buffer) => {
-                    const s = chunk.toString();
-                    ffmpegStderr += s;
-                    queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_STERR]", s);
-                });
-                (ffmpegStream as FfmpegStreamWithEvents).on?.("error", (e: unknown) => {
-                    queue.client.logger.error("[PLAY_HANDLER][FFMPEG_ERROR]", e);
-                    const errStr = String(e ?? "");
-                    const isPremature =
-                        errStr.includes("Premature close") ||
-                        (isErrnoException(e) && e.code === "ERR_STREAM_PREMATURE_CLOSE");
-                    if (isPremature) {
-                        queue.client.logger.debug(
-                            "[PLAY_HANDLER] Ignoring premature-close ffmpeg error",
-                            e,
-                        );
-                        return;
-                    }
-                    try {
-                        queue.player.emit(
-                            "error",
-                            new AudioPlayerError(e as Error, undefined as never),
-                        );
-                    } catch (_) {}
-                });
-                (ffmpegStream as FfmpegStreamWithEvents).on?.("close", async (code?: unknown) => {
-                    queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_CLOSE]", code);
-                    try {
-                        await fsp.unlink(tmpFile).catch(() => null);
-                        queue.client.logger.debug("[PLAY_HANDLER] Temp file deleted", tmpFile);
-                    } catch {}
+                ffmpeg = spawnFfmpeg(args, {
+                    onStderr,
+                    onError: onDecodeError,
+                    onClose: (code) => {
+                        queue.client.logger.debug("[PLAY_HANDLER][FFMPEG_CLOSE]", code);
+                        void fsp
+                            .unlink(tmpFile)
+                            .then(() =>
+                                queue.client.logger.debug(
+                                    "[PLAY_HANDLER] Temp file deleted",
+                                    tmpFile,
+                                ),
+                            )
+                            .catch(() => null);
+                    },
                 });
             }
         } else {
@@ -489,12 +449,10 @@ export async function play(
 
     let resource: import("@discordjs/voice").AudioResource<unknown> | undefined;
     try {
-        queue.client.logger.debug(
-            "[PLAY_HANDLER] Creating audio resource with inputType=Arbitrary",
-        );
-        resource = createAudioResource(ffmpegStream, {
+        queue.client.logger.debug("[PLAY_HANDLER] Creating audio resource with inputType=Raw");
+        resource = createAudioResource(ffmpeg.output, {
             inlineVolume: true,
-            inputType: StreamType.Arbitrary,
+            inputType: StreamType.Raw,
             metadata: song,
         });
 

@@ -48,6 +48,8 @@ export function ffmpegArgs(
         inputArgs.push("-i", "-");
     }
 
+    // Raw 16-bit PCM at Discord's rate: exactly what the voice library's volume
+    // control and Opus encoder take, with nothing left for it to decode.
     return [
         "-loglevel",
         "0",
@@ -58,9 +60,9 @@ export function ffmpegArgs(
         "-ac",
         "2",
         "-f",
-        "opus",
+        "s16le",
         "-acodec",
-        "libopus",
+        "pcm_s16le",
         ...(audioFilters.length > 0 ? ["-af", audioFilters.join(",")] : []),
     ];
 }

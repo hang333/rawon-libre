@@ -115,10 +115,3 @@ export function hasGetGuildIdsWithQueueState(
             "function"
     );
 }
-
-export interface FfmpegStreamWithEvents {
-    stderr?: {
-        on?(event: string, cb: (chunk: import("node:buffer").Buffer) => void): void;
-    };
-    on?(event: string, cb: (...args: unknown[]) => void): void;
-}
